@@ -18,10 +18,10 @@ class RcMemoryBus(am.lib.wiring.Signature):
             'mreq': am.lib.wiring.Out(1),
             'iorq': am.lib.wiring.Out(1),
             'rd': am.lib.wiring.Out(1),
-            'rd_valid': am.lib.wiring.In(1),
             'wr': am.lib.wiring.Out(1),
             'addr': am.lib.wiring.Out(addr_width),
             'data_rd': am.lib.wiring.In(data_width),
+            'data_rd_valid': am.lib.wiring.In(1),
             'data_wr': am.lib.wiring.Out(data_width),
         })
 

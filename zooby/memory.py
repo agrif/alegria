@@ -44,7 +44,7 @@ class Memory(am.lib.wiring.Component):
                 m.d.sync += am.Print(am.Format("mem/r: 0x{:04x} + 0x{:04x}: 0x{:02x}", self.base_addr, memory_rd.addr, memory_rd.data))
             m.d.comb += [
                 self.bus.memory.data_rd.eq(memory_rd.data),
-                self.bus.memory.rd_valid.eq(1),
+                self.bus.memory.data_rd_valid.eq(1),
             ]
 
         if not self.read_only:
