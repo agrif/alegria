@@ -3,7 +3,10 @@ import amaranth.lib.data
 import amaranth.lib.enum
 import amaranth.lib.wiring
 
+import zooby.lib.serial
+
 # Motorola MC6850 ACIA
+# https://www.jameco.com/Jameco/Products/ProdDS/43633.pdf
 # https://www.cpcwiki.eu/imgs/3/3f/MC6850.pdf
 
 class Mc6850(am.lib.wiring.Component):
@@ -100,6 +103,8 @@ class Mc6850(am.lib.wiring.Component):
     def elaborate(self, platform):
         m = am.Module()
 
+        m.submodules.tx = tx = zooby.lib.serial.Tx(bits=8, txdomain=self.txdomain)
+
         chipselect = self.cs0 & self.cs1 & ~self.cs2_n
 
         # some state to detect writes on e falling edge
@@ -109,10 +114,10 @@ class Mc6850(am.lib.wiring.Component):
         m.d.sync += prev_was_write.eq(0)
 
         # FIXME actual status
-        m.d.comb += self.status.tdre.eq(1)
+        m.d.comb += self.status.tdre.eq(~tx.valid)
 
+        # memory reads
         with m.If(chipselect & self.e & self.r_w_n):
-            # read
             with m.If(self.rs):
                 # read rx register
                 self.trace(m, 'r rx 0x{:02x}', self.d_out)
@@ -130,6 +135,7 @@ class Mc6850(am.lib.wiring.Component):
                     self.d_out_valid.eq(1),
                 ]
 
+        # memory writes
         with m.If(chipselect & self.e & ~self.r_w_n):
             # write should occur when e goes low, while r_w_n low
             # so store d_in for later
@@ -140,17 +146,26 @@ class Mc6850(am.lib.wiring.Component):
             ]
 
 
+        # detect e falling edge and perform writes
         with m.If(prev_was_write & ~self.e):
             # falling edge on e after write
             with m.If(prev_rs):
                 # write tx register
                 self.trace(m, 'w tx 0x{:02x}', prev_d_in)
-                # FIXME this has side effects
-                m.d.sync += am.Print(am.Format('{:c}', prev_d_in), end='')
+                # FIXME this has side effects, maybe
+                with m.If(~tx.valid):
+                    m.d.sync += [
+                        tx.data.eq(prev_d_in),
+                        tx.valid.eq(1),
+                    ]
             with m.Else():
                 # write control register
                 self.trace(m, 'w control {}', self.ControlRaw(prev_d_in))
                 # FIXME this might have side effects?
                 m.d.sync += self.control.eq(prev_d_in)
+
+        # shuffle tx data to tx
+        with m.If(tx.valid & tx.ready):
+            m.d.sync += tx.valid.eq(0)
 
         return m

@@ -41,7 +41,7 @@ def build():
     import zooby.cxxrtl
 
     platform = zooby.cxxrtl.CxxRtlPlatform()
-    platform.add_file_from_resource(__package__, 'cxxrtl_driver.cpp')
+    platform.add_file('cxxrtl/driver.cpp', importlib.resources.files().joinpath('cxxrtl_driver.cpp').read_text())
 
     top = Demo()
     platform.build(top)
