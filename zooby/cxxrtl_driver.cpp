@@ -110,7 +110,7 @@ int main(int argc, char *const *argv) {
         cxxrtl_vcd_timescale(vcd, 100, "ns");
         cxxrtl_vcd_add_from_without_memories(vcd, top);
 
-        vcd_file = fopen("test.vcd", "w");
+        vcd_file = fopen(vcd_file_name, "w");
         if (!vcd_file) {
             fprintf(stderr, "%s: could not open file '%s'\n", argv[0], vcd_file_name);
             return 1;
