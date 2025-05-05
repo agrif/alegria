@@ -103,6 +103,7 @@ class Mc6850(am.lib.wiring.Component):
     def elaborate(self, platform):
         m = am.Module()
 
+        m.submodules.rx = rx = zooby.lib.serial.Rx(bits=8, rxdomain=self.rxdomain)
         m.submodules.tx = tx = zooby.lib.serial.Tx(bits=8, txdomain=self.txdomain)
 
         chipselect = self.cs0 & self.cs1 & ~self.cs2_n
@@ -113,19 +114,34 @@ class Mc6850(am.lib.wiring.Component):
         prev_d_in = am.Signal.like(self.d_in)
         m.d.sync += prev_was_write.eq(0)
 
+        # hold on to rx data, since rx submodule isn't guaranteed to
+        rx_data = am.Signal(8)
+
         # FIXME actual status
+        m.d.comb += self.status.rdrf.eq(rx.valid)
         m.d.comb += self.status.tdre.eq(~tx.valid)
+        m.d.comb += self.status.irq_n.eq(self.irq_n)
+        m.d.comb += self.irq_n.eq(~(self.control.receive_interrupt_enable & rx.valid))
+        m.d.comb += self.rts_n.eq(self.control.transmit_control == self.Control.TransmitControl.NONE)
+        m.d.comb += rx.rts.eq(~self.rts_n)
 
         # memory reads
         with m.If(chipselect & self.e & self.r_w_n):
             with m.If(self.rs):
                 # read rx register
                 self.trace(m, 'r rx 0x{:02x}', self.d_out)
-                # FIXME
-                m.d.comb += [
-                    self.d_out.eq(0),
-                    self.d_out_valid.eq(1),
-                ]
+                with m.If(rx.valid):
+                    m.d.comb += [
+                        self.d_out.eq(rx.data),
+                        self.d_out_valid.eq(1),
+                        rx.ready.eq(1),
+                    ]
+                    m.d.sync += rx_data.eq(rx.data)
+                with m.Else():
+                    m.d.comb += [
+                        self.d_out.eq(rx_data),
+                        self.d_out_valid.eq(1),
+                    ]
             with m.Else():
                 # read status register
                 self.trace(m, 'r status {}', self.status)
