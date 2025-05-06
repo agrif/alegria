@@ -6,10 +6,10 @@
 
 namespace cxxrtl_design {
 
-    template<size_t BITS>
-    struct cxxrtl_serial_rx_stdin : public bb_p_cxxrtl__serial__rx<BITS> {
+    template<size_t MAX_BITS>
+    struct cxxrtl_serial_rx_stdin : public bb_p_cxxrtl__serial__rx<MAX_BITS> {
         int fd;
-        cxxrtl_serial_rx_stdin() : bb_p_cxxrtl__serial__rx<BITS>() {
+        cxxrtl_serial_rx_stdin() : bb_p_cxxrtl__serial__rx<MAX_BITS>() {
             fd = fileno(stdin);
             int flags = fcntl(fd, F_GETFL, 0);
 
@@ -61,7 +61,7 @@ namespace cxxrtl_design {
                 }
             }
 
-            return bb_p_cxxrtl__serial__rx<BITS>::eval(performer);
+            return bb_p_cxxrtl__serial__rx<MAX_BITS>::eval(performer);
         }
     };
 
@@ -71,8 +71,8 @@ namespace cxxrtl_design {
         return std::make_unique<cxxrtl_serial_rx_stdin<8>>();
     }
 
-    template<size_t BITS>
-    struct cxxrtl_serial_tx_stdout : public bb_p_cxxrtl__serial__tx<BITS> {
+    template<size_t MAX_BITS>
+    struct cxxrtl_serial_tx_stdout : public bb_p_cxxrtl__serial__tx<MAX_BITS> {
         bool eval(performer *performer) override {
             if (this->posedge_p_clk()) {
                 // always ready
@@ -86,14 +86,14 @@ namespace cxxrtl_design {
                 }
             }
 
-            return bb_p_cxxrtl__serial__tx<BITS>::eval(performer);
+            return bb_p_cxxrtl__serial__tx<MAX_BITS>::eval(performer);
         }
     };
 
     template<>
-    std::unique_ptr<bb_p_cxxrtl__serial__tx<8>>
-    bb_p_cxxrtl__serial__tx<8>::create(std::string name, cxxrtl::metadata_map parameters, cxxrtl::metadata_map attributes) {
-        return std::make_unique<cxxrtl_serial_tx_stdout<8>>();
+    std::unique_ptr<bb_p_cxxrtl__serial__tx</*MAX_BITS=*/8>>
+    bb_p_cxxrtl__serial__tx</*MAX_BITS=*/8>::create(std::string name, cxxrtl::metadata_map parameters, cxxrtl::metadata_map attributes) {
+        return std::make_unique<cxxrtl_serial_tx_stdout</*MAX_BITS=*/8>>();
     }
 
 }

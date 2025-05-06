@@ -103,8 +103,8 @@ class Mc6850(am.lib.wiring.Component):
     def elaborate(self, platform):
         m = am.Module()
 
-        m.submodules.rx = rx = zooby.lib.serial.Rx(bits=8, rxdomain=self.rxdomain)
-        m.submodules.tx = tx = zooby.lib.serial.Tx(bits=8, txdomain=self.txdomain)
+        m.submodules.rx = rx = zooby.lib.serial.Rx(rxdomain=self.rxdomain)
+        m.submodules.tx = tx = zooby.lib.serial.Tx(txdomain=self.txdomain)
 
         chipselect = self.cs0 & self.cs1 & ~self.cs2_n
 
