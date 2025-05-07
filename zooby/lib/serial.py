@@ -2,6 +2,7 @@ import importlib
 
 import amaranth as am
 import amaranth.lib.enum
+import amaranth.lib.stream
 import amaranth.lib.wiring
 
 import zooby.cxxrtl
@@ -61,6 +62,7 @@ class Rx(am.lib.wiring.Component):
         stream.payload = self.data
         stream.valid = self.valid
         stream.ready = self.ready
+        return stream
 
     def elaborate(self, platform):
         m = am.Module()
@@ -106,6 +108,7 @@ class Tx(am.lib.wiring.Component):
         stream.payload = self.data
         stream.valid = self.valid
         stream.ready = self.ready
+        return stream
 
     def elaborate(self, platform):
         m = am.Module()
@@ -202,29 +205,3 @@ class Tx(am.lib.wiring.Component):
             m.d.comb += div.load.eq(1)
 
         return m
-
-if __name__ == '__main__':
-    import amaranth.sim
-
-    dut = Tx()
-    async def bench(ctx):
-        ctx.set(dut.divisor, 2)
-        ctx.set(dut.parity, Parity.NONE)
-        ctx.set(dut.stop_bits, StopBits.STOP_1)
-        for _ in range(3):
-            await ctx.tick()
-
-        ctx.set(dut.data, 0xaa)
-        ctx.set(dut.valid, 1)
-        for _ in range(70):
-            consumed = ctx.get(dut.ready) and ctx.get(dut.valid)
-            await ctx.tick()
-            if consumed:
-                ctx.set(dut.data, 0)
-                ctx.set(dut.valid, 0)
-
-    sim = am.sim.Simulator(dut)
-    sim.add_clock(1e-6)
-    sim.add_testbench(bench)
-    with sim.write_vcd('tx.vcd'):
-        sim.run()
