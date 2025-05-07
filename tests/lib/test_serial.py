@@ -1,5 +1,5 @@
 import amaranth as am
-from parameterized import parameterized_class
+from parameterized import parameterized, parameterized_class
 
 from ..simulator import SimulatorTestCase
 
@@ -7,7 +7,40 @@ from zooby.lib.serial import *
 
 # serial helpers
 class SerialTestCase(SimulatorTestCase):
-    TESTDATA = [0x000, 0x1ff, 0x0aa, 0x155, 0x134, 0x0cd]
+    TEST_DATA = [0x000, 0x1ff, 0x0aa, 0x155, 0x134, 0x0cd]
+
+    TEST_PARAMS = [
+        {'divisor': div, 'data_bits': bits, 'stop_bits': stop, 'parity': parity}
+        for div in [1, 3, 16]
+        for bits in [7, 8, 9]
+        for stop in StopBits
+        for parity in Parity
+    ]
+
+    @classmethod
+    def parameterized_class(cls, f):
+        def name(cls, num, params_dict):
+            return '_'.join([
+                cls.__name__,
+                str(num),
+                'd' + parameterized.to_safe_name(params_dict['divisor']),
+                'b' + parameterized.to_safe_name(params_dict['data_bits']),
+                parameterized.to_safe_name(params_dict['stop_bits'].name),
+                parameterized.to_safe_name(params_dict['parity'].name),
+            ])
+        return parameterized_class(cls.TEST_PARAMS, class_name_func=name)(f)
+
+    def tx_traces(self, tx):
+        return [
+            tx.tx,
+            tx.stream,
+            {'config': [
+                tx.divisor,
+                tx.data_bits,
+                tx.stop_bits,
+                tx.parity,
+            ]},
+        ]
 
     async def serial_read_err(self, ctx, rx, assertions=True):
         divisor = self.divisor
@@ -70,46 +103,28 @@ class SerialTestCase(SimulatorTestCase):
         value, _, _ = await self.serial_read_err(ctx, rx, assertions=True)
         return value
 
-@parameterized_class([
-    {'divisor': div, 'data_bits': bits, 'stop_bits': stop, 'parity': parity}
-    for div in [1, 3, 16]
-    for bits in [7, 8, 9]
-    for stop in StopBits
-    for parity in Parity
-])
-class TestTx(SerialTestCase):
-    def setUp(self):
-        self.dut = Tx(max_divisor=16, max_bits=9)
-        self.traces = [
-            self.dut.tx,
-            self.dut.stream,
-            {'config': [
-                self.dut.divisor,
-                self.dut.data_bits,
-                self.dut.stop_bits,
-                self.dut.parity,
-            ]},
-        ]
-
+@SerialTestCase.parameterized_class
+class TestSerial(SerialTestCase):
     def test_tx(self):
-        with self.simulate(self.dut, traces=self.traces) as sim:
+        dut = Tx(max_divisor=16, max_bits=9)
+        with self.simulate(dut, traces=self.tx_traces(dut)) as sim:
             sim.add_clock(am.Period(Hz=115200 * 64))
 
             @sim.add_testbench
             async def write(ctx):
-                ctx.set(self.dut.divisor, self.divisor)
-                ctx.set(self.dut.data_bits, self.data_bits)
-                ctx.set(self.dut.stop_bits, self.stop_bits)
-                ctx.set(self.dut.parity, self.parity)
+                ctx.set(dut.divisor, self.divisor)
+                ctx.set(dut.data_bits, self.data_bits)
+                ctx.set(dut.stop_bits, self.stop_bits)
+                ctx.set(dut.parity, self.parity)
 
                 await ctx.tick().repeat(3)
 
-                for v in self.TESTDATA:
-                    await self.stream_put(ctx, self.dut.stream, v)
+                for v in self.TEST_DATA:
+                    await self.stream_put(ctx, dut.stream, v)
 
             @sim.add_testbench
             async def read(ctx):
-                for v in self.TESTDATA:
-                    value = await self.serial_read(ctx, self.dut.tx)
+                for v in self.TEST_DATA:
+                    value = await self.serial_read(ctx, dut.tx)
                     mask = (1 << self.data_bits) - 1
                     self.assertEqual(value, v & mask)
