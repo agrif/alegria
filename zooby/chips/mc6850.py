@@ -106,6 +106,11 @@ class Mc6850(am.lib.wiring.Component):
         m.submodules.rx = rx = zooby.lib.serial.Rx(rxdomain=self.rxdomain)
         m.submodules.tx = tx = zooby.lib.serial.Tx(txdomain=self.txdomain)
 
+        m.d.comb += [
+            rx.rx.eq(self.rx),
+            self.tx.eq(tx.tx),
+        ]
+
         chipselect = self.cs0 & self.cs1 & ~self.cs2_n
 
         # some state to detect writes on e falling edge
@@ -124,6 +129,7 @@ class Mc6850(am.lib.wiring.Component):
         m.d.comb += self.irq_n.eq(~(self.control.receive_interrupt_enable & rx.valid))
         m.d.comb += self.rts_n.eq(self.control.transmit_control == self.Control.TransmitControl.NONE)
         m.d.comb += rx.rts.eq(~self.rts_n)
+        m.d.comb += tx.divisor.eq(64)
 
         # memory reads
         with m.If(chipselect & self.e & self.r_w_n):
