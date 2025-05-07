@@ -6,6 +6,7 @@ importlib_resources==6.5.2
 Jinja2==3.1.6
 jschon==0.11.1
 MarkupSafe==3.0.2
+parameterized==0.9.0
 pyvcd==0.4.1
 rfc3986==2.0.0
 wasmtime==32.0.0

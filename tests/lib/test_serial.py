@@ -1,4 +1,5 @@
 import amaranth as am
+from parameterized import parameterized_class
 
 from ..simulator import SimulatorTestCase
 
@@ -6,13 +7,13 @@ from zooby.lib.serial import *
 
 # serial helpers
 class SerialTestCase(SimulatorTestCase):
-    TESTDATA = [0x00, 0xff, 0xaa, 0x55, 0x34, 0xcd]
+    TESTDATA = [0x000, 0x1ff, 0x0aa, 0x155, 0x134, 0x0cd]
 
-    async def serial_read_err(self, ctx, cfg, rx):
-        divisor = ctx.get(cfg.divisor)
-        data_bits = ctx.get(cfg.data_bits)
-        stop_bits = ctx.get(cfg.stop_bits)
-        parity = ctx.get(cfg.parity)
+    async def serial_read_err(self, ctx, rx, assertions=True):
+        divisor = self.divisor
+        data_bits = self.data_bits
+        stop_bits = self.stop_bits
+        parity = self.parity
 
         # wait for a start bit
         # using .until(rx == 0) eats 1 clock at the end, which is no bueno
@@ -23,6 +24,8 @@ class SerialTestCase(SimulatorTestCase):
         if divisor // 2 > 0:
             await ctx.tick().repeat(divisor // 2)
         start = ctx.get(rx)
+        if assertions:
+            self.assertEqual(start, 0)
         if start:
             return (None, False, False)
 
@@ -41,6 +44,8 @@ class SerialTestCase(SimulatorTestCase):
             expected = sum(bits) % 2
             if parity == Parity.EVEN:
                 expected = 1 - expected
+            if assertions:
+                self.assertEqual(parity_bit, expected)
             if parity_bit != expected:
                 parity_error = True
 
@@ -48,29 +53,33 @@ class SerialTestCase(SimulatorTestCase):
         framing_error = False
         stop_waits = [divisor]
         if stop_bits == StopBits.STOP_1_5:
-            stop_waits.append(divisor - (divisor // 4))
+            stop_waits.append(divisor // 2 + divisor // 4)
         elif stop_bits == StopBits.STOP_2:
             stop_waits.append(divisor)
         for wait in stop_waits:
-            await ctx.tick().repeat(wait)
-            if not ctx.get(rx):
+            await ctx.tick().repeat(max(wait, 1))
+            stop = ctx.get(rx)
+            if assertions:
+                self.assertEqual(stop, 1)
+            if not stop:
                 framing_error = True
 
         return (value, parity_error, framing_error)
 
-    async def serial_read(self, ctx, cfg, rx):
-        value, parity_error, framing_error = await self.serial_read_err(ctx, cfg, rx)
-        if value is None:
-            self.fail('start bit not found')
-        if parity_error:
-            self.fail('bad parity bit')
-        if framing_error:
-            self.fail('bad stop bits')
+    async def serial_read(self, ctx, rx, assertions=True):
+        value, _, _ = await self.serial_read_err(ctx, rx, assertions=True)
         return value
 
+@parameterized_class([
+    {'divisor': div, 'data_bits': bits, 'stop_bits': stop, 'parity': parity}
+    for div in [1, 3, 16]
+    for bits in [7, 8, 9]
+    for stop in StopBits
+    for parity in Parity
+])
 class TestTx(SerialTestCase):
     def setUp(self):
-        self.dut = Tx()
+        self.dut = Tx(max_divisor=16, max_bits=9)
         self.traces = [
             self.dut.tx,
             self.dut.stream,
@@ -88,7 +97,11 @@ class TestTx(SerialTestCase):
 
             @sim.add_testbench
             async def write(ctx):
-                ctx.set(self.dut.divisor, 4)
+                ctx.set(self.dut.divisor, self.divisor)
+                ctx.set(self.dut.data_bits, self.data_bits)
+                ctx.set(self.dut.stop_bits, self.stop_bits)
+                ctx.set(self.dut.parity, self.parity)
+
                 await ctx.tick().repeat(3)
 
                 for v in self.TESTDATA:
@@ -97,5 +110,6 @@ class TestTx(SerialTestCase):
             @sim.add_testbench
             async def read(ctx):
                 for v in self.TESTDATA:
-                    value = await self.serial_read(ctx, self.dut, self.dut.tx)
-                    self.assertEqual(value, v)
+                    value = await self.serial_read(ctx, self.dut.tx)
+                    mask = (1 << self.data_bits) - 1
+                    self.assertEqual(value, v & mask)

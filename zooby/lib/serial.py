@@ -181,9 +181,8 @@ class Tx(am.lib.wiring.Component):
             parity_start = 1 + data_bits
             end = parity_start + parity.has_parity + stop_bits.bits
 
-            # fill unused high bits with 1s (stop bits)
+            # data mask
             mask = ((1 << data_bits) - 1)[:self.max_bits]
-            masked_data = data | ~mask
 
             domain += [
                 # safe: end > 1
@@ -192,14 +191,14 @@ class Tx(am.lib.wiring.Component):
                 # start bit
                 shift_reg[0].eq(0),
                 # data
-                shift_reg[1:self.max_bits + 1].eq(masked_data),
+                shift_reg[1:self.max_bits + 1].eq(data | ~mask),
                 # parity done below
                 # stop bits automatic since this register is full of 1s
             ]
 
             # parity bit
             with m.If(parity.has_parity):
-                domain += shift_reg.bit_select(parity_start, 1).eq(parity.calculate(masked_data))
+                domain += shift_reg.bit_select(parity_start, 1).eq(parity.calculate(data & mask))
 
             # reload the clock divider
             m.d.comb += div.load.eq(1)
