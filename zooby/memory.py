@@ -36,15 +36,22 @@ class Memory(am.lib.wiring.Component):
 
         select = (self.bus.memory.addr[addr_bits:] << addr_bits) == self.base_addr
 
-        memory_rd = memory.read_port(domain='comb')
-        m.d.comb += memory_rd.addr.eq(self.bus.memory.addr[:addr_bits])
+        memory_rd = memory.read_port(domain='sync')
+        m.d.comb += [
+            memory_rd.addr.eq(self.bus.memory.addr[:addr_bits]),
+            memory_rd.en.eq(0),
+        ]
 
+        read_valid = am.Signal(1)
+        m.d.sync += read_valid.eq(0)
         with m.If(self.bus.memory.mreq & self.bus.memory.rd & select):
             if self.debug:
                 m.d.sync += am.Print(am.Format("mem/r: 0x{:04x} + 0x{:04x}: 0x{:02x}", self.base_addr, memory_rd.addr, memory_rd.data))
+            m.d.sync += read_valid.eq(1)
             m.d.comb += [
+                memory_rd.en.eq(1),
                 self.bus.memory.data_rd.eq(memory_rd.data),
-                self.bus.memory.data_rd_valid.eq(1),
+                self.bus.memory.data_rd_valid.eq(read_valid),
             ]
 
         if not self.read_only:

@@ -47,7 +47,7 @@ class BareCpu(am.lib.wiring.Component):
     di: am.lib.wiring.In(8)
     dout: am.lib.wiring.Out(8)
 
-    def __init__(self, variant=Variant.S, mode=Mode.Z80, t2write=None, iowait=True):
+    def __init__(self, variant=Variant.N, mode=Mode.Z80, t2write=None, iowait=True):
         if t2write is None:
             t2write = variant.t2write_default()
 
@@ -95,7 +95,7 @@ class BareCpu(am.lib.wiring.Component):
 class Cpu(am.lib.wiring.Component):
     bus: am.lib.wiring.Out(zooby.bus.RcBus())
 
-    def __init__(self, variant=Variant.S, mode=Mode.Z80, t2write=None, iowait=True):
+    def __init__(self, variant=Variant.N, mode=Mode.Z80, t2write=None, iowait=True):
         self._bare = BareCpu(variant=variant, mode=mode, t2write=t2write, iowait=iowait)
         super().__init__()
 
