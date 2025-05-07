@@ -5,6 +5,7 @@ import amaranth.lib.enum
 import amaranth.lib.wiring
 
 import zooby.cxxrtl
+from .clock_divider import ClockDivider
 
 # helper to add blackbox files to platform
 def _use_blackbox(platform):
@@ -136,24 +137,8 @@ class Tx(am.lib.wiring.Component):
             raise RuntimeError('txdomain not implemented')
 
         # clock divider
-        clock_div = am.Signal(am.Signal(range(self.max_divisor)).shape().width + 1)
-        clock_div_en = am.Signal(1)
-        clock_div_next = clock_div - clock_div_en
-        clock_div_overflow = am.Signal(1)
-        clock_div_reload = am.Signal(1)
-
-        # overflow bit taken on dec, to get it one clock early
-        m.d.comb += clock_div_overflow.eq(clock_div_next[-1])
-
-        # register clock_div_next into clock_div
-        domain += clock_div.eq(clock_div_next)
-
-        # if the divider oveflows next cycle, reload it
-        m.d.comb += clock_div_reload.eq(clock_div_overflow)
-
-        # reload to overflow in divisor cycles
-        with m.If(clock_div_reload):
-            domain += clock_div.eq(divisor - 1)
+        m.submodules.div = div = am.DomainRenamer(self.txdomain)(ClockDivider(max_divisor=self.max_divisor))
+        m.d.comb += div.divisor.eq(divisor)
 
         # state, 1 in position n means output n + 1 bits
         # start + data_bits + parity? + stop
@@ -161,34 +146,41 @@ class Tx(am.lib.wiring.Component):
         # busy if state bit set
         busy = state.any()
 
-        # enable the clock divider only when busy
-        m.d.comb += clock_div_en.eq(busy)
+        # data to shift out, fill with 1s
+        shift_reg = am.Signal.like(state, init=-1)
 
-        # data to shift out
-        shift_reg = am.Signal.like(state)
-
-        # on divider overflow, shift state and the register to the right
-        # and update parity
-        with m.If(clock_div_overflow):
-            domain += [
-                state.eq(state >> 1),
-                shift_reg.eq(shift_reg >> 1),
+        # output shift register to tx while busy, and turn on divider
+        with m.If(busy):
+            m.d.comb += [
+                div.en.eq(1),
+                self.tx.eq(shift_reg[0]),
             ]
 
-        # output shift register to tx while busy
-        with m.If(busy):
-            m.d.comb += self.tx.eq(shift_reg[0])
+        # on divider pulse, shift state and the register to the right
+        # and update parity
+        # fill in empty bits of the shift register with 1s
+        with m.If(div.pulse):
+            domain += [
+                state.eq(state >> 1),
+                shift_reg[:-1].eq(shift_reg >> 1),
+                shift_reg[-1].eq(1),
+            ]
+
+        # fiddly: change what the divider loads to on 1.5 stop bits
+        with m.If(stop_bits.matches(StopBits.STOP_1_5) & state[1]):
+            m.d.comb += div.divisor.eq(divisor >> 1)
 
         # we are only ready if we're not busy, or if it's the very last cycle
-        m.d.comb += ready.eq(~busy | (state[0] & clock_div_overflow))
+        m.d.comb += ready.eq(~busy | (state[0] & div.pulse))
 
         # if we're ready and data is available, read it in
         with m.If(ready & valid):
             parity_start = 1 + data_bits
-            stop_start = parity_start + parity.has_parity
-            end = stop_start + stop_bits.bits
+            end = parity_start + parity.has_parity + stop_bits.bits
 
-            masked_data = data & ((1 << data_bits) - 1)
+            # fill unused high bits with 1s (stop bits)
+            mask = ((1 << data_bits) - 1)[:self.max_bits]
+            masked_data = data | ~mask
 
             domain += [
                 # safe: end > 1
@@ -197,15 +189,17 @@ class Tx(am.lib.wiring.Component):
                 # start bit
                 shift_reg[0].eq(0),
                 # data
-                shift_reg[1:].eq(masked_data),
-                # parity bit
-                shift_reg.bit_select(parity_start, 1).eq(parity.calculate(masked_data)),
-                # stop bits
-                shift_reg.bit_select(stop_start, 2).eq(-1),
+                shift_reg[1:self.max_bits + 1].eq(masked_data),
+                # parity done below
+                # stop bits automatic since this register is full of 1s
             ]
 
+            # parity bit
+            with m.If(parity.has_parity):
+                domain += shift_reg.bit_select(parity_start, 1).eq(parity.calculate(masked_data))
+
             # reload the clock divider
-            m.d.comb += clock_div_reload.eq(1)
+            m.d.comb += div.load.eq(1)
 
         return m
 
