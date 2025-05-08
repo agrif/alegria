@@ -41,6 +41,7 @@ class SimulatorTestCase(unittest.TestCase):
         ctx.set(stream.ready, 1)
         payload, = await ctx.tick().sample(stream.payload).until(stream.valid)
         ctx.set(stream.ready, 0)
+        return payload
 
     @staticmethod
     async def stream_put(ctx, stream, payload):

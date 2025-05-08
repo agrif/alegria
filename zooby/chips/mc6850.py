@@ -130,6 +130,7 @@ class Mc6850(am.lib.wiring.Component):
         m.d.comb += self.rts_n.eq(self.control.transmit_control == self.Control.TransmitControl.NONE)
         m.d.comb += rx.rts.eq(~self.rts_n)
         m.d.comb += tx.divisor.eq(64)
+        m.d.comb += rx.divisor.eq(64)
 
         # memory reads
         with m.If(chipselect & self.e & self.r_w_n):
