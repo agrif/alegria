@@ -9,6 +9,9 @@ class TruthTable:
         def __iter__(self):
             return iter(self._iterable)
 
+        def __len__(self):
+            return len(self._iterable)
+
     class Group:
         def __init__(self, name, iterable):
             self._name = name
@@ -23,6 +26,10 @@ class TruthTable:
         def __len__(self):
             return len(self._iterable)
 
+        @property
+        def name(self):
+            return self._name
+
     class Row:
         def __init__(self, **data):
             self._data = data
@@ -36,10 +43,21 @@ class TruthTable:
             return self._data[k]
 
         def __getattr__(self, k):
-            return self._data[k]
+            try:
+                return self._data[k]
+            except KeyError:
+                raise AttributeError("'{}' object has no attribute {!r}".format(self.__class__.__name__, k))
 
         def __iter__(self):
             return iter(self._data)
+
+        def __len__(self):
+            return len(self._data)
+
+        def __eq__(self, other):
+            if isinstance(other, TruthTable.Row):
+                return self._data == other._data
+            return self._data == other
 
         def get(self, k, default=None):
             return self._data.get(k, default)
@@ -101,8 +119,12 @@ class TruthTable:
         if len(names) != len(data):
             raise RuntimeError('length mismatch: {!r} vs {!r}'.format(names, data))
         for name, x in zip(names, data):
+            if cls._iterable(name) or cls._iterable(x):
+                if not cls._iterable(name) or not cls._iterable(x):
+                    raise RuntimeError('structure mismatch: {!r} vs {!r}'.format(name, x))
+
             if isinstance(name, cls.Group):
-                yield (name._name, cls.Row(**dict(cls._apply_names(name, x))))
+                yield (name.name, cls.Row(**dict(cls._apply_names(name, x))))
             elif cls._iterable(name) and cls._iterable(x):
                 yield from cls._apply_names(name, x)
             else:
