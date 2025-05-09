@@ -15,24 +15,24 @@ class Ti74x138(am.lib.wiring.Component):
 
     @property
     def pins(self):
-        return [
-            self.a,
-            self.b,
-            self.c,
-            self.g2a_n,
-            self.g2b_n,
-            self.g1,
-            self.y[7],
-            None, # ground
-            self.y[6],
-            self.y[5],
-            self.y[4],
-            self.y[3],
-            self.y[2],
-            self.y[1],
-            self.y[0],
-            None, # vcc
-        ]
+        return {
+            1: self.a,
+            2: self.b,
+            3: self.c,
+            4: self.g2a_n,
+            5: self.g2b_n,
+            6: self.g1,
+            7: self.y[7],
+            # 8: ground,
+            9: self.y[6],
+            10: self.y[5],
+            11: self.y[4],
+            12: self.y[3],
+            13: self.y[2],
+            14: self.y[1],
+            15: self.y[0],
+            # 16: vcc,
+        }
 
     @property
     def select(self):
