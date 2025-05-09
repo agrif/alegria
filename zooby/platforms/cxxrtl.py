@@ -130,6 +130,8 @@ class CxxRtlPlatform(am.build.TemplatedPlatform):
         assert toolchain in ("gcc", "clang")
         self.toolchain = toolchain
 
+        self.add_file('cxxrtl/driver.cpp', importlib.resources.files().joinpath('cxxrtl', 'driver.cpp').read_text())
+
     @property
     def required_tools(self):
         if self.toolchain == "gcc":

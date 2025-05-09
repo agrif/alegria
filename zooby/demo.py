@@ -7,10 +7,10 @@ import zooby.rc2014
 import zooby.tv80
 
 class Demo(am.Elaboratable):
-    def __init__(self, romfile, romstart=0x0000, romend=0x2000):
-        self.romfile = romfile
-        self.romstart = romstart
-        self.romend = romend
+    def __init__(self, rom_file, rom_start=0x0000, rom_size=0x2000):
+        self.rom_file = rom_file
+        self.rom_start = rom_start
+        self.rom_size = rom_size
 
         super().__init__()
 
@@ -21,10 +21,10 @@ class Demo(am.Elaboratable):
         m.submodules.bus = bus = zooby.bus.RcBusMultiplexer()
         am.lib.wiring.connect(m, tv80.bus, bus.bus)
 
-        with open(self.romfile, 'rb') as f:
-            romdata = f.read()[self.romstart:self.romend]
+        with open(self.rom_file, 'rb') as f:
+            rom_data = f.read()[self.rom_start:self.rom_start + self.rom_size]
 
-        m.submodules.rom = rom = zooby.memory.Rom(0x0000, len(romdata), init=romdata)
+        m.submodules.rom = rom = zooby.memory.Rom(0x0000, len(rom_data), init=rom_data)
         bus.add(rom.bus)
 
         m.submodules.ram = ram = zooby.memory.Ram(0x8000, 0x8000)
