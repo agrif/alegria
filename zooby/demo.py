@@ -29,7 +29,8 @@ class Demo(am.Elaboratable):
             reset_button = platform.request('button').i
         except am.build.ResourceError:
             reset_button = 0
-        m.submodules.reset_sync = am.lib.cdc.ResetSynchronizer(arst=reset_button | ~pll.lock | am.ResetSignal(), domain='sysclk', stages=2)
+        sysclk_reset = reset_button | ~pll.lock | am.ResetSignal()
+        m.submodules.reset_sync = am.lib.cdc.ResetSynchronizer(arst=sysclk_reset, domain='sysclk', stages=2)
 
         m.submodules.system = system = am.DomainRenamer('sysclk')(System(self.rom_data))
 
@@ -37,7 +38,7 @@ class Demo(am.Elaboratable):
         try:
             uart = platform.request('uart')
             m.d.comb += [
-                uart.tx.o.eq(serial.tx),
+                uart.tx.o.eq(system.tx),
                 system.rx.eq(uart.rx.i),
             ]
         except am.build.ResourceError:

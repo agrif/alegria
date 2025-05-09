@@ -7,6 +7,7 @@ import zooby.platforms
 
 PLATFORMS = {
     'cxxrtl': zooby.platforms.CxxRtlPlatform,
+    'tangnano9k': zooby.platforms.TangNano9kPlatform,
 }
 
 @click.group
@@ -39,7 +40,7 @@ def build(**options):
     platform = PLATFORMS[options['platform']](**platform_kwargs)
 
     top = zooby.demo.Demo(options['rom_file'], rom_start=options['rom_start'], rom_size=options['rom_size'])
-    platform.build(top, program=options['program'])
+    platform.build(top, do_program=options['program'])
 
 if __name__ == '__main__':
     cli()
