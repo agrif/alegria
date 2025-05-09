@@ -159,3 +159,23 @@ class CxxRtlPlatform(am.build.TemplatedPlatform):
                 am.ResetSignal("sync").eq(rst_i),
             ]
             return m
+
+    class _Pll(am.lib.wiring.Component):
+        lock: am.lib.wiring.Out(1, init=1)
+
+        def __init__(self, in_period, out_period, domain):
+            self.in_period = in_period
+            self.out_period = out_period
+            self.domain = domain
+
+            super().__init__()
+
+        def elaborate(self, platform):
+            m = am.Module()
+
+            m.d.comb += am.ClockSignal(self.domain).eq(am.ClockSignal())
+
+            return m
+
+    def generate_pll(self, in_period, out_period, domain):
+        return self._Pll(in_period, out_period, domain)
