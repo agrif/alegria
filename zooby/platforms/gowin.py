@@ -1,8 +1,16 @@
 import amaranth as am
+import amaranth.vendor
 
 import amaranth_boards.tang_nano_9k
 
-class GowinPlatform:
+class GowinPlatform(am.vendor.GowinPlatform):
+    def __init__(self, *args, **kwargs):
+        # alas, the open source toolchain can't really handle this
+        if not 'toolchain' in kwargs:
+            kwargs['toolchain'] = 'Gowin'
+
+        super().__init__(*args, **kwargs)
+
     class _Pll_GW1NR_9C_C6I5(am.lib.wiring.Component):
         lock: am.lib.wiring.Out(1)
 
