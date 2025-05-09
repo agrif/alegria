@@ -1,12 +1,19 @@
 amaranth @ git+https://github.com/amaranth-lang/amaranth.git@7664a00f4d3033e353b2f3a00802abb7403c0b68
 amaranth-boards @ git+https://github.com/amaranth-lang/amaranth-boards.git@c26a72e59c786b38e0e989ae64c6c2560ca7c29c
 amaranth-yosys==0.50.0.0.post111
+bcrypt==4.3.0
+cffi==1.17.1
 click==8.1.8
+cryptography==44.0.3
 importlib_resources==6.5.2
 Jinja2==3.1.6
 jschon==0.11.1
 MarkupSafe==3.0.2
 parameterized==0.9.0
+paramiko==2.12.0
+pycparser==2.22
+PyNaCl==1.5.0
 pyvcd==0.4.1
 rfc3986==2.0.0
+six==1.17.0
 wasmtime==32.0.0
