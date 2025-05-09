@@ -27,17 +27,28 @@ class BasedInt(click.ParamType):
 
 @cli.command
 @click.argument('rom-file')
-@click.option('--rom-start', type=BasedInt(), default=0x0000)
-@click.option('--rom-size', type=BasedInt(), default=0x2000)
-@click.option('--platform', '-p', type=click.Choice(PLATFORMS.keys()), default='cxxrtl')
-@click.option('--toolchain', '-t', metavar='TOOLCHAIN')
-@click.option('--generate', '-g', is_flag=True)
-@click.option('--archive', '-a', type=click.File('wb'))
-@click.option('--path', default='build')
-@click.option('--top-name', default='top')
-@click.option('--ssh')
-@click.option('--ssh-path')
-@click.option('--program/--no-program')
+@click.option('--rom-start', type=BasedInt(), default=0x0000,
+              help='offset inside the rom file to load')
+@click.option('--rom-size', type=BasedInt(), default=0x2000,
+              help='size of the rom region')
+@click.option('--platform', '-p', type=click.Choice(PLATFORMS.keys()), default='cxxrtl',
+              help='target platform')
+@click.option('--toolchain', '-t', metavar='TOOLCHAIN',
+              help='toolchain to use for the target platform')
+@click.option('--generate', '-g', is_flag=True,
+              help='generate files only, do not build')
+@click.option('--archive', '-a', type=click.File('wb'),
+              help='compress generated files into a zip')
+@click.option('--path', default='build', metavar='BUILDPATH',
+              help='location to place generated and built files')
+@click.option('--top-name', default='top', metavar='TOP',
+              help='name of the toplevel module')
+@click.option('--ssh', metavar='HOST',
+              help='ssh host use for build')
+@click.option('--ssh-path', metavar='BUILDPATH',
+              help='path on ssh host to place generated and built files')
+@click.option('--program/--no-program',
+              help='program the board after build')
 def build(**options):
     if options['archive']:
         options['generate'] = True
