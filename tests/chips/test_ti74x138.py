@@ -1,3 +1,5 @@
+# amaranth: UnusedElaboratable=no
+
 import amaranth as am
 
 from ..simulator import SimulatorTestCase
@@ -17,6 +19,12 @@ class TestTi74x138(SimulatorTestCase):
             {'select': self.dut.select},
             self.dut.y,
         ]
+
+    def test_pins(self):
+        self.dut.pins
+
+    def test_select(self):
+        self.dut.select
 
     def test_truth(self):
         # any bit
