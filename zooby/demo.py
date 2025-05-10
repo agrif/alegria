@@ -51,8 +51,10 @@ class System(am.lib.wiring.Component):
 
     rx: am.lib.wiring.In(1)
     tx: am.lib.wiring.Out(1)
-
     rts: am.lib.wiring.Out(1)
+
+    input: am.lib.wiring.In(8)
+    output: am.lib.wiring.Out(8)
 
     def __init__(self, rom_data):
         self.rom_data = rom_data
@@ -78,6 +80,13 @@ class System(am.lib.wiring.Component):
             serial.rx.eq(self.rx),
             self.tx.eq(serial.tx),
             self.rts.eq(serial.rts),
+        ]
+
+        m.submodules.io = io = zooby.rc2014.DigitalIOv2()
+        bus.add(io.bus)
+        m.d.comb += [
+            io.input.eq(self.input),
+            self.output.eq(io.output),
         ]
 
         return m
