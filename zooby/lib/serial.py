@@ -85,8 +85,6 @@ class Rx(am.lib.wiring.Component):
         return stream
 
     def elaborate(self, platform):
-        m = am.Module()
-
         # use a blackbox in cxxrtl simulation
         if _use_blackbox(platform):
             return am.Instance(
@@ -98,6 +96,8 @@ class Rx(am.lib.wiring.Component):
                 i_ready=self.ready,
                 i_rts=self.rts,
             )
+
+        m = am.Module()
 
         # get all of our external signals into the rxdomain
         if self.rxdomain == 'sync':
@@ -250,8 +250,6 @@ class Tx(am.lib.wiring.Component):
         return stream
 
     def elaborate(self, platform):
-        m = am.Module()
-
         # use a blackbox in cxxrtl simulation
         if _use_blackbox(platform):
             return am.Instance(
@@ -262,6 +260,8 @@ class Tx(am.lib.wiring.Component):
                 i_valid=self.valid,
                 o_ready=self.ready,
             )
+
+        m = am.Module()
 
         # get all of our external signals into the txdomain
         if self.txdomain == 'sync':
