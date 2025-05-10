@@ -35,6 +35,7 @@ class Demo(am.Elaboratable):
         m.submodules.system = system = am.DomainRenamer('sysclk')(System(self.rom_data))
 
         # connect the uart pins
+        # FIXME should there be a synchronizer on rx?
         try:
             uart = platform.request('uart')
             m.d.comb += [
@@ -43,6 +44,37 @@ class Demo(am.Elaboratable):
             ]
         except am.build.ResourceError:
             pass
+
+        # connect the io output to leds
+        leds = []
+        for i in range(8):
+            try:
+                leds.append(platform.request('led', i).o)
+            except am.build.ResourceError:
+                break
+
+        for signal, led in zip(system.output, leds):
+            m.d.comb += led.eq(signal)
+
+        # connect the io input to switches
+        # FIXME should there be a synchronizer on the switches?
+        switches = []
+        for i in range(8):
+            try:
+                switches.append(platform.request('switch', i).i)
+            except am.build.ResourceError:
+                break
+
+        # if there are no switches, use the rest of the buttons
+        if not switches:
+            for i in range(8):
+                try:
+                    switches.append(platform.request('button', i + 1).i)
+                except am.build.ResourceError:
+                    break
+
+        for signal, switch in zip(system.input, switches):
+            m.d.comb += signal.eq(switch)
 
         return m
 
