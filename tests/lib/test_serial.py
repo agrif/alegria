@@ -261,7 +261,8 @@ class TestSerial(SerialTestCase):
                     await self.serial_write(ctx, dut.rx, 0x01, stops=stops)
 
                     # reset in between, as missing stop bits look like starts
-                    await ctx.tick()
+                    # careful, rx is synchronized
+                    await ctx.tick().repeat(10)
                     ctx.set(rst, 1)
                     await ctx.tick()
                     ctx.set(rst, 0)

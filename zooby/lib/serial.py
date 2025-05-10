@@ -1,6 +1,7 @@
 import importlib
 
 import amaranth as am
+import amaranth.lib.cdc
 import amaranth.lib.data
 import amaranth.lib.enum
 import amaranth.lib.stream
@@ -114,6 +115,13 @@ class Rx(am.lib.wiring.Component):
         else:
             raise RuntimeError('rxdomain not implemented')
 
+        # it's a U(A)RT, it's asynchronous and so self.rx needs sync'd to
+        # the rxdomain. if configured with divisor=1 (synchronous),
+        # all this does is add two cycles of latency
+        # we want a reset so it does not generate spurious start bits
+        rx = am.Signal()
+        m.submodules.rx_sync = am.lib.cdc.FFSynchronizer(i=self.rx, o=rx, o_domain=self.rxdomain, init=1, reset_less=False)
+
         # clock divider
         m.submodules.div = div = am.DomainRenamer(self.rxdomain)(ClockDivider(max_divisor=self.max_divisor))
         m.d.comb += div.divisor.eq(divisor)
@@ -138,7 +146,7 @@ class Rx(am.lib.wiring.Component):
             domain += [
                 state.eq(state >> 1),
                 shift_reg[:-1].eq(shift_reg >> 1),
-                shift_reg[-1].eq(self.rx),
+                shift_reg[-1].eq(rx),
             ]
 
         # fiddly: change what the divider loads to on 1.5 stop bits
@@ -162,7 +170,7 @@ class Rx(am.lib.wiring.Component):
         # if rx is high and we're not busy, keep the divider loaded with
         # a half bit period so we can detect start bits
         # also do this on the very last cycle of a decode
-        with m.If((self.rx & ~busy) | (state[0] & div.pulse)):
+        with m.If((rx & ~busy) | (state[0] & div.pulse)):
             m.d.comb += [
                 div.divisor.eq(divisor >> 1),
                 div.load.eq(1),
@@ -170,7 +178,7 @@ class Rx(am.lib.wiring.Component):
 
         # if rx is low and we're not busy, turn on the divider to count
         # half a start bit
-        with m.If(~self.rx & ~busy):
+        with m.If(~rx & ~busy):
             m.d.comb += div.en.eq(1)
 
             # if we hit a divider pulse, we found a start bit, so
@@ -195,7 +203,7 @@ class Rx(am.lib.wiring.Component):
             rx_data = shift_reg.bit_select(data_start, self.max_bits) & mask
 
             # if this stop bit or the previous is low, it's a framing error
-            framing_error = ~self.rx | ((stop_bits != StopBits.STOP_1) & ~shift_reg[-1])
+            framing_error = ~rx | ((stop_bits != StopBits.STOP_1) & ~shift_reg[-1])
 
             # check the parity bit
             parity_error = parity.has_parity & (shift_reg.bit_select(parity_start, 1) != parity.calculate(rx_data))

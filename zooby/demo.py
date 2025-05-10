@@ -35,7 +35,6 @@ class Demo(am.Elaboratable):
         m.submodules.system = system = am.DomainRenamer('sysclk')(System(self.rom_data))
 
         # connect the uart pins
-        # FIXME should there be a synchronizer on rx?
         try:
             uart = platform.request('uart')
             m.d.comb += [
@@ -57,7 +56,6 @@ class Demo(am.Elaboratable):
             m.d.comb += led.eq(signal)
 
         # connect the io input to switches
-        # FIXME should there be a synchronizer on the switches?
         switches = []
         for i in range(8):
             try:

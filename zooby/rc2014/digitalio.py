@@ -39,6 +39,11 @@ class DigitalIOv2(am.lib.wiring.Component):
         input_sel = decoder.y[4:][self.input_port]
         output_sel = decoder.y[:4][self.output_port]
 
+        # original board doesn't have this but we'll add it
+        # inputs are usually not synchronized, sync them here
+        input_sync = am.Signal(8)
+        m.submodules.input_sync = am.lib.cdc.FFSynchronizer(i=self.input, o=input_sync)
+
         m.d.comb += [
             decoder.a.eq(self.bus.memory.addr[0] * self.link_a0),
             decoder.b.eq(self.bus.memory.addr[1] * self.link_a1),
@@ -52,7 +57,7 @@ class DigitalIOv2(am.lib.wiring.Component):
             input.dir.eq(0),
             self.bus.memory.data_rd.eq(input.a_out),
             self.bus.memory.data_rd_valid.eq(input.a_out_valid),
-            input.b_in.eq(self.input),
+            input.b_in.eq(input_sync),
 
             output.d.eq(self.bus.memory.data_wr),
             output.clk.eq(output_sel),
