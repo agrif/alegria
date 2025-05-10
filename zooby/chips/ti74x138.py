@@ -10,7 +10,7 @@ class Ti74x138(am.lib.wiring.Component):
 
     g2a_n: am.lib.wiring.In(1)
     g2b_n: am.lib.wiring.In(1)
-    g1: am.lib.wiring.In(1)
+    g1: am.lib.wiring.In(1, init=1)
 
     # note: active low, but datasheet just calls it 'Y'
     y: am.lib.wiring.Out(8, init=-1)

@@ -14,7 +14,7 @@ class Ti74x245(am.lib.wiring.Component):
     b_out: am.lib.wiring.Out(8)
     b_out_valid: am.lib.wiring.Out(1)
 
-    oe_n: am.lib.wiring.In(1)
+    oe_n: am.lib.wiring.In(1, init=1)
 
     @property
     def pins(self):
