@@ -31,13 +31,21 @@ class TruthTable:
             return self._name
 
     class Row:
-        def __init__(self, **data):
-            self._data = data
+        def __init__(self, *args, **data):
+            if not ((len(args) == 1 and len(data) == 0) or len(args) == 0):
+                    raise TypeError('TruthTable.Roww() takes either 1 positional argument or only keyword arguments')
+
+            if args:
+                self._data = args[0]
+            else:
+                self._data = data
 
         def __repr__(self):
-            return 'TruthTable.Row({})'.format(
-                ', '.join('{}={!r}'.format(k, v) for k, v in self._data.items())
-            )
+            if all(isinstance(k, str) for k in self._data):
+                inner = ', '.join('{}={!r}'.format(k, v) for k, v in self._data.items())
+            else:
+                inner = repr(self._data)
+            return 'TruthTable.Row({})'.format(inner)
 
         def __getitem__(self, k):
             return self._data[k]
@@ -124,7 +132,7 @@ class TruthTable:
                     raise RuntimeError('structure mismatch: {!r} vs {!r}'.format(name, x))
 
             if isinstance(name, cls.Group):
-                yield (name.name, cls.Row(**dict(cls._apply_names(name, x))))
+                yield (name.name, cls.Row(dict(cls._apply_names(name, x))))
             elif cls._iterable(name) and cls._iterable(x):
                 yield from cls._apply_names(name, x)
             else:
@@ -132,4 +140,4 @@ class TruthTable:
 
     def __iter__(self):
         for row in self._expand_rows(self._rows):
-            yield self.Row(**dict(self._apply_names(self._column_names, row)))
+            yield self.Row(dict(self._apply_names(self._column_names, row)))

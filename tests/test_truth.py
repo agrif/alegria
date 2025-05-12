@@ -78,6 +78,25 @@ class TestRow(unittest.TestCase):
         self.assertEqual(list(r.keys()), ['a', 'b', 'c'])
         self.assertEqual(list(r.values()), [0, 1, 2])
 
+    def test_constructor(self):
+        r = TruthTable.Row(a=0, b=1, c=2)
+        s = TruthTable.Row(dict(a=0, b=1, c=2))
+        self.assertEqual(r, s)
+        with self.assertRaises(TypeError):
+            TruthTable.Row(dict(a=0, b=1), c=2)
+        with self.assertRaises(TypeError):
+            TruthTable.Row(dict(a=0), dict(b=1, c=2))
+        with self.assertRaises(TypeError):
+            TruthTable.Row(dict(a=0), dict(b=1), c=2)
+
+    def test_nonstring_keys(self):
+        orig = {'a': 0, None: 1, 1: 2}
+        r = TruthTable.Row(orig)
+        self.assertEqual(r.a, 0)
+        self.assertEqual(r[None], 1)
+        self.assertEqual(r[1], 2)
+        self.assertEqual({k: v for k, v in r.items()}, orig)
+
 class TestTruth(unittest.TestCase):
     def test_simple(self):
         t = TruthTable(
