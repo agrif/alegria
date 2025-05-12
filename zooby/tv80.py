@@ -105,19 +105,19 @@ class Cpu(am.lib.wiring.Component):
         m.submodules.bare = bare = self._bare
 
         m.d.comb += [
-            bare.wait_n.eq(~self.bus.memory.wait),
-            bare.int_n.eq(~self.bus.int),
-            bare.nmi_n.eq(~self.bus.nmi),
-            bare.busrq_n.eq(~self.bus.busreq),
+            bare.wait_n.eq(self.bus.memory.wait_n),
+            bare.int_n.eq(self.bus.int_n),
+            bare.nmi_n.eq(self.bus.nmi_n),
+            bare.busrq_n.eq(self.bus.busreq_n),
 
-            self.bus.m1.eq(~bare.m1_n),
-            self.bus.memory.mreq.eq(~bare.mreq_n),
-            self.bus.memory.iorq.eq(~bare.iorq_n),
-            self.bus.memory.rd.eq(~bare.rd_n),
-            self.bus.memory.wr.eq(~bare.wr_n),
-            self.bus.rfsh.eq(~bare.rfsh_n),
-            self.bus.halt.eq(~bare.halt_n),
-            self.bus.busack.eq(~bare.busak_n),
+            self.bus.m1_n.eq(bare.m1_n),
+            self.bus.memory.mreq_n.eq(bare.mreq_n),
+            self.bus.memory.iorq_n.eq(bare.iorq_n),
+            self.bus.memory.rd_n.eq(bare.rd_n),
+            self.bus.memory.wr_n.eq(bare.wr_n),
+            self.bus.rfsh_n.eq(bare.rfsh_n),
+            self.bus.halt_n.eq(bare.halt_n),
+            self.bus.busack_n.eq(bare.busak_n),
 
             self.bus.memory.addr.eq(bare.A),
             bare.di.eq(self.bus.memory.data_rd),

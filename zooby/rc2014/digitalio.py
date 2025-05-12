@@ -47,10 +47,10 @@ class DigitalIOv2(am.lib.wiring.Component):
         m.d.comb += [
             decoder.a.eq(self.bus.memory.addr[0] * self.link_a0),
             decoder.b.eq(self.bus.memory.addr[1] * self.link_a1),
-            decoder.c.eq(~self.bus.memory.wr),
+            decoder.c.eq(self.bus.memory.wr_n),
 
-            decoder.g1.eq(~self.bus.m1),
-            decoder.g2b_n.eq(~self.bus.memory.iorq),
+            decoder.g1.eq(self.bus.m1_n),
+            decoder.g2b_n.eq(self.bus.memory.iorq_n),
             decoder.g2a_n.eq(addr_or),
 
             input.oe_n.eq(input_sel),

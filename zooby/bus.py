@@ -1,13 +1,24 @@
 import amaranth as am
 import amaranth.lib.wiring
 
-def bitwise_any(*signals):
+def _bitwise_any(*signals):
     if not all(s.shape() == signals[0].shape() for s in signals):
         raise ValueError('all inputs must be the same shape')
 
     bits = [[s[i] for s in signals] for i in range(len(signals[0]))]
 
     return am.Cat(*[am.Cat(*b).any() for b in bits])
+
+def _active_low(signal):
+    # invert the signal, and monkeypatch it so that .eq works
+    # this is an awful hack, but handy to prevent ~~sig_n madness
+    v = ~signal
+
+    def eq(value, *, src_loc_at=0):
+        return signal.eq(~value, src_loc_at=src_loc_at + 1)
+    v.eq = eq
+
+    return v
 
 class RcMemoryBus(am.lib.wiring.Signature):
     def __init__(self, addr_width=16, data_width=8):
@@ -38,6 +49,30 @@ class RcMemoryBus(am.lib.wiring.Signature):
 
     def __repr__(self):
         return f'RcMemoryBus(addr_width={self.addr_width}, data_width={self.data_width})'
+
+    def create(self, *, path=None, src_loc_at=0):
+        return RcMemoryBusInterface(self, path=path, src_loc_at=1 + src_loc_at)
+
+class RcMemoryBusInterface(am.lib.wiring.PureInterface):
+    @property
+    def wait_n(self):
+        return _active_low(self.wait)
+
+    @property
+    def mreq_n(self):
+        return _active_low(self.mreq)
+
+    @property
+    def iorq_n(self):
+        return _active_low(self.iorq)
+
+    @property
+    def rd_n(self):
+        return _active_low(self.rd)
+
+    @property
+    def wr_n(self):
+        return _active_low(self.wr)
 
 class RcBus(am.lib.wiring.Signature):
     def __init__(self, addr_width=16, data_width=8):
@@ -74,7 +109,33 @@ class RcBus(am.lib.wiring.Signature):
         return RcBusInterface(self, path=path, src_loc_at=1 + src_loc_at)
 
 class RcBusInterface(am.lib.wiring.PureInterface):
-    pass
+    @property
+    def m1_n(self):
+        return _active_low(self.m1)
+
+    @property
+    def rfsh_n(self):
+        return _active_low(self.rfsh)
+
+    @property
+    def halt_n(self):
+        return _active_low(self.halt)
+
+    @property
+    def int_n(self):
+        return _active_low(self.int)
+
+    @property
+    def nmi_n(self):
+        return _active_low(self.nmi)
+
+    @property
+    def busreq_n(self):
+        return _active_low(self.busreq)
+
+    @property
+    def busack_n(self):
+        return _active_low(self.busack)
 
 class RcBusMultiplexer(am.lib.wiring.Component):
     def __init__(self, addr_width=16, data_width=8):
@@ -115,7 +176,7 @@ class RcBusMultiplexer(am.lib.wiring.Component):
                     mem_signals.setdefault(path[1:], []).append(sig)
 
         # bitwise-any together the memory signals
-        mem_signals = {k: bitwise_any(*v) for k, v in mem_signals.items()}
+        mem_signals = {k: _bitwise_any(*v) for k, v in mem_signals.items()}
 
         # flip signature because we're inside elaborate
         for (path, flow, sig) in self.bus.signature.flip().flatten(self.bus):
@@ -133,6 +194,6 @@ class RcBusMultiplexer(am.lib.wiring.Component):
                     m.d.comb += [dsig.eq(sig) for dsig in all_signals[path]]
                 else:
                     # cpu inputs get or'd together
-                    m.d.comb += sig.eq(bitwise_any(*all_signals[path]))
+                    m.d.comb += sig.eq(_bitwise_any(*all_signals[path]))
 
         return m

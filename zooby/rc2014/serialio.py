@@ -23,17 +23,17 @@ class SerialIO(am.lib.wiring.Component):
         m.submodules.inverter = inverter = zooby.chips.Ti74x04()
 
         m.d.comb += [
-            inverter.a[0].eq(~self.bus.memory.iorq),
+            inverter.a[0].eq(self.bus.memory.iorq_n),
 
             acia.rx.eq(self.rx),
             self.rts.eq(~acia.rts_n),
             self.tx.eq(acia.tx),
-            self.bus.int.eq(~acia.irq_n),
-            acia.cs0.eq(~self.bus.m1),
+            self.bus.int_n.eq(acia.irq_n),
+            acia.cs0.eq(self.bus.m1_n),
             acia.cs2_n.eq(self.bus.memory.addr[6]),
             acia.cs1.eq(self.bus.memory.addr[7]),
             acia.rs.eq(self.bus.memory.addr[0]),
-            acia.r_w_n.eq(~self.bus.memory.wr),
+            acia.r_w_n.eq(self.bus.memory.wr_n),
             acia.e.eq(inverter.y[0]),
             acia.d_in.eq(self.bus.memory.data_wr),
             self.bus.memory.data_rd.eq(acia.d_out),
