@@ -18,22 +18,26 @@ class SerialIO(am.lib.wiring.Component):
     def elaborate(self, platform):
         m = am.Module()
 
-        m.submodules.mc6850 = mc6850 = zooby.chips.Mc6850()
+        # original board also includes a MAX232 that makes no sense here
+        m.submodules.acia = acia = zooby.chips.Mc6850()
+        m.submodules.inverter = inverter = zooby.chips.Ti74x04()
 
         m.d.comb += [
-            mc6850.rx.eq(self.rx),
-            self.rts.eq(~mc6850.rts_n),
-            self.tx.eq(mc6850.tx),
-            self.bus.int.eq(~mc6850.irq_n),
-            mc6850.cs0.eq(~self.bus.m1),
-            mc6850.cs2_n.eq(self.bus.memory.addr[6]),
-            mc6850.cs1.eq(self.bus.memory.addr[7]),
-            mc6850.rs.eq(self.bus.memory.addr[0]),
-            mc6850.r_w_n.eq(~self.bus.memory.wr),
-            mc6850.e.eq(self.bus.memory.iorq),
-            mc6850.d_in.eq(self.bus.memory.data_wr),
-            self.bus.memory.data_rd.eq(mc6850.d_out),
-            self.bus.memory.data_rd_valid.eq(mc6850.d_out_valid),
+            inverter.a[0].eq(~self.bus.memory.iorq),
+
+            acia.rx.eq(self.rx),
+            self.rts.eq(~acia.rts_n),
+            self.tx.eq(acia.tx),
+            self.bus.int.eq(~acia.irq_n),
+            acia.cs0.eq(~self.bus.m1),
+            acia.cs2_n.eq(self.bus.memory.addr[6]),
+            acia.cs1.eq(self.bus.memory.addr[7]),
+            acia.rs.eq(self.bus.memory.addr[0]),
+            acia.r_w_n.eq(~self.bus.memory.wr),
+            acia.e.eq(inverter.y[0]),
+            acia.d_in.eq(self.bus.memory.data_wr),
+            self.bus.memory.data_rd.eq(acia.d_out),
+            self.bus.memory.data_rd_valid.eq(acia.d_out_valid),
         ]
 
         return m
