@@ -11,54 +11,111 @@ class GowinPlatform(am.vendor.GowinPlatform):
 
         super().__init__(*args, **kwargs)
 
-    class _Pll_GW1NR_9C_C6I5(am.lib.wiring.Component):
+    class _Pll(am.lib.wiring.Component):
+        # this is similar to apycula.gowin_pll but we also handle
+        # the final clock divider
+        # see also:
+        # https://juj.github.io/gowin_fpga_code_generators/pll_calculator.html
+
         lock: am.lib.wiring.Out(1)
 
-        def __init__(self, in_period, out_period, domain):
+        PLL_INFO = {
+            ('GW1NR-9C', 'C6/I5'): {
+                'pll_name': 'rPLL',
+                'pfd': (3, 400),
+                'clkout': (3.125, 600),
+                'vco': (400, 1200),
+            },
+        }
+
+        # ehhh, good enough for uart
+        MAX_PPM = 500
+
+        def __init__(self, platform, in_period, out_period, domain):
             self.in_period = in_period
             self.out_period = out_period
             self.domain = domain
 
-            if abs(self.in_period.megahertz - 27) > 0.001:
-                raise NotImplementedError('input frequency must be 27 MHz')
-            if abs(self.out_period.megahertz - 7.375) > 0.005:
-                raise NotImplementedError('output frequency must be 7.375 MHz')
+            self._calculate_params(platform)
 
             super().__init__()
 
-        def elaborate(self, platform):
-            assert platform.family == 'GW1NR-9C'
-            assert platform.part.endswith('C6/I5')
+        def _calculate_params(self, platform):
+            key = (platform.family, platform.speed)
+            try:
+                info = self.PLL_INFO[key]
+            except KeyError:
+                raise NotImplementedError('PLL not implemented for {!r}'.format(key))
 
-            # https://juj.github.io/gowin_fpga_code_generators/pll_calculator.html
-            # FCLKIN = 27 MHz
-            # PFD = 3 MHz
-            # CLKOUT = 177 MHz
-            # VCO = 708 MHz
-            # CLKOUTD = 7.375 MHz
+            fclkin = self.in_period.megahertz
+            params = None
+            diff = None
+
+            names = ['IDIV_SEL', 'pfd', 'FBDIV_SEL', 'clkout', 'ODIV_SEL', 'vco', 'DYN_SDIV_SEL', 'clkoutd']
+            valids = (
+                {n: locals()[n] for n in names}
+
+                for IDIV_SEL in range(64)
+                if info['pfd'][0] <= (pfd := fclkin / (IDIV_SEL + 1)) <= info['pfd'][1]
+
+                for FBDIV_SEL in range(64)
+                if info['clkout'][0] < (clkout := pfd * (FBDIV_SEL + 1)) < info['clkout'][1]
+
+                for ODIV_SEL in range(2, 130, 2)
+                if info['vco'][0] < (vco := clkout * ODIV_SEL) < info['vco'][1]
+
+                # 0 stands in for "use clkout not clkoutd"
+                for DYN_SDIV_SEL in range(0, 130, 2)
+                for clkoutd in [clkout / max(DYN_SDIV_SEL, 1)]
+            )
+
+            for v in valids:
+                new_params = info.copy()
+                new_params.update(v)
+                new_params.update({
+                    'output': v['clkoutd'],
+                    'output_signal': 'CLKOUTD',
+                    'fclkin': fclkin,
+                    'FCLKIN': '{:.6f}'.format(fclkin),
+                })
+
+                if v['DYN_SDIV_SEL'] == 0:
+                    new_params.update({
+                        'output': v['clkout'],
+                        'output_signal': 'CLKOUT',
+                    })
+
+                    del new_params['DYN_SDIV_SEL']
+                    del new_params['clkoutd']
+
+                new_diff = abs((new_params['output'] / self.out_period.megahertz) - 1)
+                if params is None or diff > new_diff:
+                    params = new_params
+                    diff = new_diff
+
+            ppm = diff * 1e6
+            if ppm > self.MAX_PPM:
+                raise RuntimeError('PLL settings not found: wanted {:.6f}, best is {:.6f} ({:.0f} ppm)'.format(self.out_period.megahertz, params['output'], ppm))
+
+            self._params = params
+            self.out_period = am.Period(MHz=params['output'])
+
+        def elaborate(self, platform):
+            args = {}
+            for k in ['FCLKIN', 'IDIV_SEL', 'FBDIV_SEL', 'ODIV_SEL', 'DYN_SDIV_SEL']:
+                args['p_' + k] = self._params[k]
+
+            args['i_CLKIN'] = am.ClockSignal()
+            args['o_' + self._params['output_signal']] = am.ClockSignal(self.domain)
+            args['o_LOCK'] = self.lock
 
             return am.Instance(
-                'rPLL',
-                p_FCLKIN="27",
-                p_IDIV_SEL=8,
-                p_FBDIV_SEL=58,
-                p_DYN_SDIV_SEL=24,
-                p_ODIV_SEL=4,
-                i_CLKIN=am.ClockSignal(),
-                o_CLKOUTD=am.ClockSignal(self.domain),
-                o_LOCK=self.lock,
+                self._params['pll_name'],
+                **args,
             )
 
     def generate_pll(self, in_period, out_period, domain):
-        PLLMAP = {
-            ('GW1NR-9C', 'C6/I5'): self._Pll_GW1NR_9C_C6I5,
-        }
-
-        for (family, part_end), Pll in PLLMAP.items():
-            if self.family == family and self.part.endswith(part_end):
-                return Pll(in_period, out_period, domain)
-
-        raise NotImplementedError('no PLL found for {}'.format(self.part))
+        return self._Pll(self, in_period, out_period, domain)
 
 class TangNano9kPlatform(amaranth_boards.tang_nano_9k.TangNano9kPlatform, GowinPlatform):
     pass
