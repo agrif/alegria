@@ -15,11 +15,15 @@ class SerialIO(am.lib.wiring.Component):
 
     rts: am.lib.wiring.Out(1)
 
+    def __init__(self, debug=False):
+        self._debug = debug
+        super().__init__()
+
     def elaborate(self, platform):
         m = am.Module()
 
         # original board also includes a MAX232 that makes no sense here
-        m.submodules.acia = acia = zooby.chips.Mc6850()
+        m.submodules.acia = acia = zooby.chips.Mc6850(debug=self._debug)
         m.submodules.inverter = inverter = zooby.chips.Ti74x04()
 
         m.d.comb += [
