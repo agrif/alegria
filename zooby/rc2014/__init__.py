@@ -2,5 +2,6 @@
 # https://rc2014.co.uk/
 # RC2014 is a trademark of RFC2795 Ltd
 
+from .compactflash import CompactFlashv1
 from .digitalio import DigitalIOv1, DigitalIOv2
 from .serialio import SerialIO

@@ -3,7 +3,9 @@ import amaranth.build
 import amaranth.lib.wiring
 
 import zooby.bus
+import zooby.lib.compactflash
 import zooby.memory
+import zooby.platforms
 import zooby.rc2014
 import zooby.tv80
 
@@ -118,5 +120,11 @@ class System(am.lib.wiring.Component):
             io.input.eq(self.input),
             self.output.eq(io.output),
         ]
+
+        m.submodules.cf = cf = zooby.rc2014.CompactFlashv1()
+        bus.add(cf.bus)
+        if isinstance(platform, zooby.platforms.CxxRtlPlatform):
+            m.submodules.cfcard = cfcard = zooby.lib.compactflash.CompactFlashEmulator()
+            am.lib.wiring.connect(m, cf.card, cfcard.card)
 
         return m
