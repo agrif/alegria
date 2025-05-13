@@ -48,7 +48,7 @@ class _DigitalIOCommon(am.lib.wiring.Component):
         return m
 
 # Digital IO v1
-# IO ports 0x00, 0x04, .., 0x7c (default)
+# IO ports 0x00, 0x04, .., 0x7c (default), primary 0x00
 # https://rc2014.co.uk/modules/other-modules/digital-io-v1-0/
 class DigitalIOv1(_DigitalIOCommon):
     bus: am.lib.wiring.In(zooby.bus.RcBus())

@@ -5,7 +5,7 @@ import zooby.bus
 import zooby.chips
 
 # old, MC68B50 serial card
-# IO ports 0x80 - 0xBF
+# IO ports 0x80 - 0xBF, primary 0x80 - 0x81
 # https://rc2014.co.uk/modules/retired/serial-io/
 class SerialIO(am.lib.wiring.Component):
     bus: am.lib.wiring.In(zooby.bus.RcBus())
