@@ -151,12 +151,14 @@ class CxxRtlPlatform(am.build.TemplatedPlatform):
     def create_missing_domain(self, name):
         if name == "sync":
             m = am.Module()
-            clk_i = self.request(self.default_clk).i
-            rst_i = self.request(self.default_rst).i
+            clk_pin = self.request(self.default_clk, dir='-')
+            rst_pin = self.request(self.default_rst, dir='-')
+            m.submodules.clk_buf = clk_buf = am.lib.io.Buffer('i', clk_pin)
+            m.submodules.rst_buf = rst_buf = am.lib.io.Buffer('i', rst_pin)
             m.domains.sync = am.ClockDomain("sync")
             m.d.comb += [
-                am.ClockSignal("sync").eq(clk_i),
-                am.ResetSignal("sync").eq(rst_i),
+                am.ClockSignal("sync").eq(clk_buf.i),
+                am.ResetSignal("sync").eq(rst_buf.i),
             ]
             return m
 
