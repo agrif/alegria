@@ -24,6 +24,12 @@ class GowinPlatform(am.vendor.GowinPlatform):
                 'clkout': (3.125, 600),
                 'vco': (400, 1200),
             },
+            ('GW2A-18C', 'C8/I7'): {
+                'pll_name': 'rPLL',
+                'pfd': (3, 500),
+                'clkout': (3.90625, 625),
+                'vco': (500, 1250),
+            },
         }
 
         # ehhh, good enough for uart
