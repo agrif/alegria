@@ -1,8 +1,6 @@
 import amaranth as am
 import amaranth.vendor
 
-import amaranth_boards.tang_nano_9k
-
 class GowinPlatform(am.vendor.GowinPlatform):
     def __init__(self, *args, **kwargs):
         # alas, the open source toolchain can't really handle this
@@ -117,5 +115,6 @@ class GowinPlatform(am.vendor.GowinPlatform):
     def generate_pll(self, in_period, out_period, domain):
         return self._Pll(self, in_period, out_period, domain)
 
-class TangNano9kPlatform(amaranth_boards.tang_nano_9k.TangNano9kPlatform, GowinPlatform):
-    pass
+    @classmethod
+    def upgrade_platform(cls, plat):
+        return type(plat.__name__, (plat, cls), {})
