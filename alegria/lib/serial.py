@@ -350,3 +350,77 @@ class Tx(am.lib.wiring.Component):
             m.d.comb += div.load.eq(1)
 
         return m
+
+if __name__ == '__main__':
+    import click
+    import alegria.cli
+
+    cli = alegria.cli.BuildAndGenerate()
+
+    @click.option('--baud', type=int, default=115200, show_default=True)
+    @click.option('--divisor', type=alegria.cli.BasedInt(),
+                  default=64, show_default=True)
+    @cli.build()
+    class Demo(am.Elaboratable):
+        def __init__(self, baud, divisor):
+            self.baud = baud
+            self.divisor = divisor
+
+        def elaborate(self, platform):
+            m = am.Module()
+
+            m.domains.uartclk = am.ClockDomain()
+            m.submodules.pll = platform.generate_pll(
+                platform.default_clk_period,
+                am.Period(Hz=self.baud * self.divisor),
+                'uartclk',
+            )
+
+            m.submodules.tx = tx = am.DomainRenamer('uartclk')(
+                Tx(max_divisor=self.divisor))
+            m.submodules.rx = rx = am.DomainRenamer('uartclk')(
+                Rx(max_divisor=self.divisor))
+
+            m.d.comb += [
+                # set divisor
+                tx.divisor.eq(self.divisor),
+                rx.divisor.eq(self.divisor),
+
+                # echo rx to tx
+                tx.data.eq(rx.data.data),
+                tx.valid.eq(rx.valid),
+                rx.ready.eq(tx.ready),
+            ]
+
+            try:
+                uart = platform.request('uart', dir='-')
+                m.submodules.txbuf = txbuf = am.lib.io.Buffer('o', uart.tx)
+                m.submodules.rxbuf = rxbuf = am.lib.io.Buffer('i', uart.rx)
+                m.d.comb += [
+                    txbuf.o.eq(tx.tx),
+                    rx.rx.eq(rxbuf.i),
+                ]
+            except am.build.ResourceError:
+                pass
+
+            return m
+
+    @click.option('--max-bits', type=alegria.cli.BasedInt(),
+                  default=8, show_default=True)
+    @click.option('--max-divisor', type=alegria.cli.BasedInt(),
+                  default=127, show_default=True)
+    @click.option('--rxdomain', type=str, default='sync')
+    @cli.generate()
+    def rx(**kwargs):
+        return Rx(**kwargs)
+
+    @click.option('--max-bits', type=alegria.cli.BasedInt(),
+                  default=8, show_default=True)
+    @click.option('--max-divisor', type=alegria.cli.BasedInt(),
+                  default=127, show_default=True)
+    @click.option('--txdomain', type=str, default='sync')
+    @cli.generate()
+    def tx(**kwargs):
+        return Tx(**kwargs)
+
+    cli.run()
