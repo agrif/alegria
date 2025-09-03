@@ -165,10 +165,12 @@ class CxxRtlPlatform(am.build.TemplatedPlatform):
     class _Pll(am.lib.wiring.Component):
         lock: am.lib.wiring.Out(1, init=1)
 
-        def __init__(self, in_period, out_period, domain):
+        def __init__(self, in_period, out_period, domain, max_ppm):
             self.in_period = in_period
             self.out_period = out_period
             self.domain = domain
+            self.max_ppm = max_ppm
+            self.ppm = max_ppm
 
             super().__init__()
 
@@ -179,5 +181,5 @@ class CxxRtlPlatform(am.build.TemplatedPlatform):
 
             return m
 
-    def generate_pll(self, in_period, out_period, domain):
-        return self._Pll(in_period, out_period, domain)
+    def generate_pll(self, in_period, out_period, domain, max_ppm=500):
+        return self._Pll(in_period, out_period, domain, max_ppm)

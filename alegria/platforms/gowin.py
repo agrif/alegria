@@ -32,13 +32,12 @@ class GowinPlatform(am.vendor.GowinPlatform):
             },
         }
 
-        # ehhh, good enough for uart
-        MAX_PPM = 500
-
-        def __init__(self, platform, in_period, out_period, domain):
+        def __init__(self, platform, in_period, out_period, domain, max_ppm):
             self.in_period = in_period
             self.out_period = out_period
             self.domain = domain
+            self.max_ppm = max_ppm
+            self.ppm = None
 
             self._calculate_params(platform)
 
@@ -98,11 +97,12 @@ class GowinPlatform(am.vendor.GowinPlatform):
                     diff = new_diff
 
             ppm = diff * 1e6
-            if ppm > self.MAX_PPM:
+            if ppm > self.max_ppm:
                 raise RuntimeError('PLL settings not found: wanted {:.6f}, best is {:.6f} ({:.0f} ppm)'.format(self.out_period.megahertz, params['output'], ppm))
 
             self._params = params
             self.out_period = am.Period(MHz=params['output'])
+            self.ppm = ppm
 
         def elaborate(self, platform):
             args = {}
@@ -118,8 +118,8 @@ class GowinPlatform(am.vendor.GowinPlatform):
                 **args,
             )
 
-    def generate_pll(self, in_period, out_period, domain):
-        return self._Pll(self, in_period, out_period, domain)
+    def generate_pll(self, in_period, out_period, domain, max_ppm=500):
+        return self._Pll(self, in_period, out_period, domain, max_ppm)
 
     @classmethod
     def upgrade_platform(cls, plat):
