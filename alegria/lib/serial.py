@@ -7,12 +7,12 @@ import amaranth.lib.enum
 import amaranth.lib.stream
 import amaranth.lib.wiring
 
-import zooby.platforms
+import alegria.platforms
 from .clock_divider import ClockDivider
 
 # helper to add blackbox files to platform
 def _use_blackbox(platform):
-    if isinstance(platform, zooby.platforms.CxxRtlPlatform):
+    if isinstance(platform, alegria.platforms.CxxRtlPlatform):
         for name in ['cxxrtl_serial.v', 'cxxrtl_serial.cpp']:
             platform.add_file('cxxrtl/' + name.split('_', 1)[1], importlib.resources.files().joinpath('serial', name).read_text())
         return True

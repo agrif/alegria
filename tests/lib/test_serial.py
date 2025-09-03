@@ -3,7 +3,7 @@ from parameterized import parameterized, parameterized_class
 
 from ..simulator import SimulatorTestCase
 
-from zooby.lib.serial import *
+from alegria.lib.serial import *
 
 # serial helpers
 class SerialTestCase(SimulatorTestCase):

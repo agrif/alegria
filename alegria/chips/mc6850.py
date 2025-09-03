@@ -3,7 +3,7 @@ import amaranth.lib.data
 import amaranth.lib.enum
 import amaranth.lib.wiring
 
-import zooby.lib.serial
+import alegria.lib.serial
 
 # Motorola MC6850 ACIA
 # https://www.jameco.com/Jameco/Products/ProdDS/43633.pdf
@@ -103,8 +103,8 @@ class Mc6850(am.lib.wiring.Component):
     def elaborate(self, platform):
         m = am.Module()
 
-        m.submodules.rx = rx = zooby.lib.serial.Rx(rxdomain=self.rxdomain)
-        m.submodules.tx = tx = zooby.lib.serial.Tx(txdomain=self.txdomain)
+        m.submodules.rx = rx = alegria.lib.serial.Rx(rxdomain=self.rxdomain)
+        m.submodules.tx = tx = alegria.lib.serial.Tx(txdomain=self.txdomain)
 
         m.d.comb += [
             rx.rx.eq(self.rx),

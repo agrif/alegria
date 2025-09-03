@@ -5,7 +5,7 @@ import amaranth as am
 from ..simulator import SimulatorTestCase
 from ..truth import TruthTable
 
-from zooby.chips import Ti74x138
+from alegria.chips import Ti74x138
 
 class TestTi74x138(SimulatorTestCase):
     def setUp(self):
