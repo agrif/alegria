@@ -148,20 +148,6 @@ class CxxRtlPlatform(am.build.TemplatedPlatform):
             return self._clang_command_templates
         assert False
 
-    def create_missing_domain(self, name):
-        if name == "sync":
-            m = am.Module()
-            clk_pin = self.request(self.default_clk, dir='-')
-            rst_pin = self.request(self.default_rst, dir='-')
-            m.submodules.clk_buf = clk_buf = am.lib.io.Buffer('i', clk_pin)
-            m.submodules.rst_buf = rst_buf = am.lib.io.Buffer('i', rst_pin)
-            m.domains.sync = am.ClockDomain("sync")
-            m.d.comb += [
-                am.ClockSignal("sync").eq(clk_buf.i),
-                am.ResetSignal("sync").eq(rst_buf.i),
-            ]
-            return m
-
     class _Pll(am.lib.wiring.Component):
         lock: am.lib.wiring.Out(1, init=1)
 
