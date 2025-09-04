@@ -355,7 +355,7 @@ if __name__ == '__main__':
     import click
     import alegria.cli
 
-    cli = alegria.cli.BuildAndGenerate()
+    cli = alegria.cli.CliBuilder(generate='generate')
 
     @click.option('--baud', type=int, default=115200, show_default=True)
     @click.option('--divisor', type=alegria.cli.BasedInt(),

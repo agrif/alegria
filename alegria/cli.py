@@ -14,7 +14,7 @@ import click
 
 import alegria.platforms
 
-__all__ = ['BasedInt', 'Builder', 'Generator', 'BuildAndGenerate']
+__all__ = ['BasedInt', 'Builder', 'Generator', 'CliBuilder']
 
 PLATFORM_CLASSES = [
     alegria.platforms.CxxRtlPlatform,
@@ -67,9 +67,9 @@ for platform in PLATFORM_CLASSES:
 PLATFORMS = {k: v for k, v in sorted(PLATFORMS.items())}
 
 FORMATS = {
-    'verilog': am.back.verilog.convert,
-    'rtlil': am.back.rtlil.convert,
-    'cxxrtl': am.back.cxxrtl.convert,
+    'verilog': am.back.verilog,
+    'rtlil': am.back.rtlil,
+    'cxxrtl': am.back.cxxrtl,
 }
 
 class BasedInt(click.ParamType):
@@ -207,14 +207,20 @@ class Generator:
     output: io.TextIOBase = sys.stdout
     name: str | None = None
     prefix: str = 'am_'
+    emit_src: bool = False
 
     def generate(self, top):
-        convert = FORMATS[self.format]
+        fmt = FORMATS[self.format]
         if self.name:
             name = self.name
         else:
             name = self.prefix + top.__class__.__name__.lower()
-        self.output.write(convert(top, name=name))
+        if hasattr(top, 'signature') and isinstance(top.signature, am.lib.wiring.Signature):
+            r = fmt.convert(top, name=name, emit_src=self.emit_src)
+        else:
+            f = am.Fragment.get(top, None)
+            r, _ = fmt.convert_fragment(f, name=name, emit_src=self.emit_src)
+        self.output.write(r)
 
     @classmethod
     def pass_generator(cls, f):
@@ -228,6 +234,8 @@ class Generator:
                       help='full name of the toplevel module')
         @click.option('--prefix', default='am_', show_default=True,
                       help='prefix for the name of the toplevel module')
+        @click.option('--emit-src/--no-emit-src',
+                      help='emit amaranth source location annotations')
         def make_generator(ctx, *args, **kwargs):
             names = (k.name for k in dataclasses.fields(cls))
             generator = cls(**{k: kwargs.pop(k) for k in names})
@@ -243,21 +251,21 @@ class Generator:
             generator.generate(top_factory())
         generate(**kwargs)
 
-class BuildAndGenerate:
-    def __init__(self, group=None, build_cmd=None, generate_cmd='generate'):
+class CliBuilder:
+    def __init__(self, group=None, build=None, generate=None):
         if group:
             self.group = group
         else:
             self.group = click.Group()
 
         self.build_group = self.group
-        if build_cmd:
-            self.build_group = click.Group(build_cmd)
+        if build:
+            self.build_group = click.Group(build)
             self.group.add_command(self.build_group)
 
         self.generate_group = self.group
-        if generate_cmd:
-            self.generate_group = click.Group(generate_cmd)
+        if generate:
+            self.generate_group = click.Group(generate)
             self.group.add_command(self.generate_group)
 
     def build(self, **kwargs):
@@ -282,6 +290,13 @@ class BuildAndGenerate:
             return self.generate_group.command(**kwargs)(
                 functools.update_wrapper(_inner_generate, f),
             )
+        return _inner
+
+    def build_and_generate(self, build=None, generate=None, **kwargs):
+        def _inner(f):
+            r = self.build(name=build, **kwargs)(f)
+            self.generate(name=generate, **kwargs)(f)
+            return r
         return _inner
 
     def run(self, **kwargs):
