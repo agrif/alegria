@@ -113,10 +113,18 @@ class GowinPlatform(am.vendor.GowinPlatform):
             args['o_' + self._params['output_signal']] = am.ClockSignal(self.domain)
             args['o_LOCK'] = self.lock
 
-            return am.Instance(
+            m = am.Module()
+
+            m.submodules.pll_impl = am.Instance(
                 self._params['pll_name'],
                 **args,
             )
+
+            clk_out = am.Signal(name=self.domain)
+            m.d.comb += clk_out.eq(am.ClockSignal(self.domain))
+            platform.add_clock_constraint(clk_out, period=self.out_period)
+
+            return m
 
     def generate_pll(self, in_period, out_period, domain, max_ppm=500):
         return self._Pll(self, in_period, out_period, domain, max_ppm)
