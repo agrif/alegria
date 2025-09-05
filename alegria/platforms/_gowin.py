@@ -1,6 +1,8 @@
 import amaranth as am
 import amaranth.vendor
 
+__all__ = ['GowinPlatform']
+
 class GowinPlatform(am.vendor.GowinPlatform):
     def __init__(self, *args, **kwargs):
         # alas, the open source toolchain can't really handle this

@@ -1,6 +1,8 @@
 import amaranth as am
 import amaranth.lib.wiring
 
+__all__ = ['Ti74x138']
+
 # Texas Instruments 74x138
 # 3-line to 8-line decoder/demultiplexer
 class Ti74x138(am.lib.wiring.Component):

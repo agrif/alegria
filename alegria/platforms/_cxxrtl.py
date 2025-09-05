@@ -10,6 +10,8 @@ import importlib
 import amaranth as am
 import amaranth.build
 
+__all__ = ['CxxRtlPlatform']
+
 class CxxRtlPlatform(am.build.TemplatedPlatform):
     device      = "cxxrtl"
     default_clk = "clk"
@@ -130,7 +132,7 @@ class CxxRtlPlatform(am.build.TemplatedPlatform):
         assert toolchain in ("gcc", "clang")
         self.toolchain = toolchain
 
-        self.add_file('cxxrtl/driver.cpp', importlib.resources.files().joinpath('cxxrtl', 'driver.cpp').read_text())
+        self.add_file('cxxrtl/driver.cpp', importlib.resources.files().joinpath('_cxxrtl', 'driver.cpp').read_text())
 
     @property
     def required_tools(self):

@@ -5,6 +5,8 @@ import amaranth.lib.wiring
 
 import alegria.lib.uart
 
+__all__ = ['Mc6850']
+
 # Motorola MC6850 ACIA
 # https://www.jameco.com/Jameco/Products/ProdDS/43633.pdf
 # https://www.cpcwiki.eu/imgs/3/3f/MC6850.pdf

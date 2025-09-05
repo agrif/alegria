@@ -1,6 +1,8 @@
 import amaranth as am
 import amaranth.lib.wiring
 
+__all__ = ['Ti74x245']
+
 # Texas Instruments 74x245
 # octal bus transciever with 3-state outputs
 class Ti74x245(am.lib.wiring.Component):

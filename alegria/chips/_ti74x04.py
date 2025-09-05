@@ -1,6 +1,8 @@
 import amaranth as am
 import amaranth.lib.wiring
 
+__all__ = ['Ti74x04']
+
 # Texas Instruments 74x04
 # hex inverter
 class Ti74x04(am.lib.wiring.Component):

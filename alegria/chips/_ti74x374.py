@@ -1,6 +1,8 @@
 import amaranth as am
 import amaranth.lib.wiring
 
+__all__ = ['Ti74x374']
+
 # Texas Instruments 74x374
 # octal D-type edge-triggered flip-flops
 class Ti74x374(am.lib.wiring.Component):
