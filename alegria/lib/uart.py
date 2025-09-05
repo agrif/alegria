@@ -13,8 +13,8 @@ from .clock_divider import ClockDivider
 # helper to add blackbox files to platform
 def _use_blackbox(platform):
     if isinstance(platform, alegria.platforms.CxxRtlPlatform):
-        for name in ['cxxrtl_serial.v', 'cxxrtl_serial.cpp']:
-            platform.add_file('cxxrtl/' + name.split('_', 1)[1], importlib.resources.files().joinpath('serial', name).read_text())
+        for name in ['cxxrtl_uart.v', 'cxxrtl_uart.cpp']:
+            platform.add_file('cxxrtl/' + name.split('_', 1)[1], importlib.resources.files().joinpath('uart', name).read_text())
         return True
     return False
 
@@ -89,7 +89,7 @@ class Rx(am.lib.wiring.Component):
         # use a blackbox in cxxrtl simulation
         if _use_blackbox(platform):
             return am.Instance(
-                'cxxrtl_serial_rx',
+                'cxxrtl_uart_rx',
                 p_MAX_BITS=self.max_bits,
                 i_clk=am.ClockSignal(),
                 o_data=self.data,
@@ -261,7 +261,7 @@ class Tx(am.lib.wiring.Component):
         # use a blackbox in cxxrtl simulation
         if _use_blackbox(platform):
             return am.Instance(
-                'cxxrtl_serial_tx',
+                'cxxrtl_uart_tx',
                 p_MAX_BITS=self.max_bits,
                 i_clk=am.ClockSignal(),
                 i_data=self.data,

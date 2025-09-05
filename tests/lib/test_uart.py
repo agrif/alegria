@@ -3,10 +3,10 @@ from parameterized import parameterized, parameterized_class
 
 from ..simulator import SimulatorTestCase
 
-from alegria.lib.serial import *
+from alegria.lib.uart import *
 
-# serial helpers
-class SerialTestCase(SimulatorTestCase):
+# uart helpers
+class UartTestCase(SimulatorTestCase):
     TEST_DATA = [0x000, 0x1ff, 0x0aa, 0x155, 0x134, 0x0cd]
 
     TEST_PARAMS = [
@@ -54,7 +54,7 @@ class SerialTestCase(SimulatorTestCase):
             ]},
         ]
 
-    async def serial_read_err(self, ctx, rx, assertions=True):
+    async def uart_read_err(self, ctx, rx, assertions=True):
         divisor = self.divisor
         data_bits = self.data_bits
         stop_bits = self.stop_bits
@@ -111,11 +111,11 @@ class SerialTestCase(SimulatorTestCase):
 
         return (value, parity_error, framing_error)
 
-    async def serial_read(self, ctx, rx, assertions=True):
-        value, _, _ = await self.serial_read_err(ctx, rx, assertions=True)
+    async def uart_read(self, ctx, rx, assertions=True):
+        value, _, _ = await self.uart_read_err(ctx, rx, assertions=True)
         return value
 
-    async def serial_write(self, ctx, tx, data, parity_error=False, stops=[1, 1]):
+    async def uart_write(self, ctx, tx, data, parity_error=False, stops=[1, 1]):
         divisor = self.divisor
         data_bits = self.data_bits
         stop_bits = self.stop_bits
@@ -157,8 +157,8 @@ class SerialTestCase(SimulatorTestCase):
         # back to high for sure
         ctx.set(tx, 1)
 
-@SerialTestCase.parameterized_class
-class TestSerial(SerialTestCase):
+@UartTestCase.parameterized_class
+class TestUart(UartTestCase):
     def set_up_tx(self):
         return Tx(max_divisor=16, max_bits=9)
 
@@ -185,7 +185,7 @@ class TestSerial(SerialTestCase):
             @sim.add_testbench
             async def read(ctx):
                 for v in self.TEST_DATA:
-                    value = await self.serial_read(ctx, dut.tx)
+                    value = await self.uart_read(ctx, dut.tx)
                     mask = (1 << self.data_bits) - 1
                     self.assertEqual(value, v & mask)
 
@@ -199,7 +199,7 @@ class TestSerial(SerialTestCase):
                 await ctx.tick().repeat(3)
 
                 for v in self.TEST_DATA:
-                    await self.serial_write(ctx, dut.rx, v)
+                    await self.uart_write(ctx, dut.rx, v)
 
             @sim.add_testbench
             async def read(ctx):
@@ -229,7 +229,7 @@ class TestSerial(SerialTestCase):
                 await ctx.tick().repeat(3)
 
                 for i, v in enumerate(parity_data):
-                    await self.serial_write(ctx, dut.rx, v, parity_error=i % 2)
+                    await self.uart_write(ctx, dut.rx, v, parity_error=i % 2)
 
             @sim.add_testbench
             async def read(ctx):
@@ -258,7 +258,7 @@ class TestSerial(SerialTestCase):
             async def write(ctx):
                 for stops in stop_patterns:
                     await ctx.tick().repeat(3)
-                    await self.serial_write(ctx, dut.rx, 0x01, stops=stops)
+                    await self.uart_write(ctx, dut.rx, 0x01, stops=stops)
 
                     # reset in between, as missing stop bits look like starts
                     # careful, rx is synchronized
@@ -295,7 +295,7 @@ class TestSerial(SerialTestCase):
                 await ctx.tick().repeat(3)
 
                 for v in self.TEST_DATA:
-                    await self.serial_write(ctx, dut.rx, v)
+                    await self.uart_write(ctx, dut.rx, v)
 
             @sim.add_testbench
             async def read(ctx):
@@ -399,7 +399,7 @@ class TestSerial(SerialTestCase):
                 await ctx.tick().repeat(3)
 
                 for v in self.TEST_DATA:
-                    await self.serial_write(ctx, rx.rx, v)
+                    await self.uart_write(ctx, rx.rx, v)
 
             @sim.add_testbench
             async def middle_no_error(ctx):
@@ -417,6 +417,6 @@ class TestSerial(SerialTestCase):
                 ctx.set(tx.parity, self.parity)
 
                 for v in self.TEST_DATA:
-                    value = await self.serial_read(ctx, tx.tx)
+                    value = await self.uart_read(ctx, tx.tx)
                     mask = (1 << self.data_bits) - 1
                     self.assertEqual(value, v & mask)
