@@ -42,7 +42,7 @@ class Parity(am.lib.enum.Enum, shape=2, view_class=ParityView):
     ODD = 0b01
     EVEN = 0b10
 
-class RxData(am.lib.data.StructLayout):
+class RxWithError(am.lib.data.StructLayout):
     def __init__(self, max_bits):
         self.max_bits = max_bits
         super().__init__({
@@ -64,7 +64,9 @@ class Rx(am.lib.wiring.Component):
         super().__init__({
             'rx': am.lib.wiring.In(1, init=1),
 
-            'data': am.lib.wiring.Out(RxData(max_bits)),
+            'data': am.lib.wiring.Out(max_bits),
+            'error': am.lib.wiring.Out(RxError),
+            'data_with_error': am.lib.wiring.Out(RxWithError(max_bits)),
             'valid': am.lib.wiring.Out(1),
             'ready': am.lib.wiring.In(1),
 
@@ -78,8 +80,16 @@ class Rx(am.lib.wiring.Component):
         })
 
     @property
+    def stream_with_error(self):
+        stream = am.lib.stream.Signature(RxWithError(self.max_bits)).create()
+        stream.payload = self.data_with_error
+        stream.valid = self.valid
+        stream.ready = self.ready
+        return stream
+
+    @property
     def stream(self):
-        stream = am.lib.stream.Signature(self.data.shape()).create()
+        stream = am.lib.stream.Signature(self.max_bits).create()
         stream.payload = self.data
         stream.valid = self.valid
         stream.ready = self.ready
@@ -100,11 +110,18 @@ class Rx(am.lib.wiring.Component):
 
         m = am.Module()
 
+        # this is just an alias
+        m.d.comb += [
+            self.data_with_error.data.eq(self.data),
+            self.data_with_error.error.eq(self.error),
+        ]
+
         # get all of our external signals into the rxdomain
         if self.rxdomain == 'sync':
             domain = m.d.sync
 
             data = self.data
+            error = self.error
             valid = self.valid
             ready = self.ready
 
@@ -214,10 +231,10 @@ class Rx(am.lib.wiring.Component):
             # if we have room in the output
             with m.If(~valid):
                 domain += [
-                    data.data.eq(rx_data),
-                    data.error.framing.eq(framing_error),
-                    data.error.parity.eq(parity_error),
-                    data.error.overrun.eq(overrun_error),
+                    data.eq(rx_data),
+                    error.framing.eq(framing_error),
+                    error.parity.eq(parity_error),
+                    error.overrun.eq(overrun_error),
                     valid.eq(1),
                     overrun_error.eq(0),
                 ]
@@ -385,12 +402,10 @@ if __name__ == '__main__':
                 # set divisor
                 tx.divisor.eq(self.divisor),
                 rx.divisor.eq(self.divisor),
-
-                # echo rx to tx
-                tx.data.eq(rx.data.data),
-                tx.valid.eq(rx.valid),
-                rx.ready.eq(tx.ready),
             ]
+
+            # echo rx to tx
+            am.lib.wiring.connect(m, rx.stream, tx.stream)
 
             try:
                 uart = platform.request('uart', dir='-')

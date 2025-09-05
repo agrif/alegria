@@ -45,7 +45,7 @@ class UartTestCase(SimulatorTestCase):
     def rx_traces(self, rx):
         return [
             rx.rx,
-            rx.stream,
+            rx.stream_with_error,
             {'config': [
                 rx.divisor,
                 rx.data_bits,
@@ -209,7 +209,7 @@ class TestUart(UartTestCase):
                 ctx.set(dut.parity, self.parity)
 
                 for v in self.TEST_DATA:
-                    value = await self.stream_get(ctx, dut.stream)
+                    value = await self.stream_get(ctx, dut.stream_with_error)
                     mask = (1 << self.data_bits) - 1
                     self.assertEqual(value.data, v & mask)
                     self.assertFalse(value.error.framing)
@@ -239,7 +239,7 @@ class TestUart(UartTestCase):
                 ctx.set(dut.parity, self.parity)
 
                 for i, v in enumerate(parity_data):
-                    value = await self.stream_get(ctx, dut.stream)
+                    value = await self.stream_get(ctx, dut.stream_with_error)
                     mask = (1 << self.data_bits) - 1
                     self.assertEqual(value.data, v & mask)
                     self.assertFalse(value.error.framing)
@@ -278,7 +278,7 @@ class TestUart(UartTestCase):
                     expected = stops != [1, 1]
                     if self.stop_bits == StopBits.STOP_1:
                         expected = not stops[0]
-                    value = await self.stream_get(ctx, dut.stream)
+                    value = await self.stream_get(ctx, dut.stream_with_error)
 
                     self.assertEqual(value.data, 0x01)
                     self.assertEqual(value.error.framing, int(expected))
@@ -324,7 +324,7 @@ class TestUart(UartTestCase):
                         last_v = v
                         continue
 
-                    value = await self.stream_get(ctx, dut.stream)
+                    value = await self.stream_get(ctx, dut.stream_with_error)
                     mask = (1 << self.data_bits) - 1
 
                     if i % 3 == 1:
@@ -368,7 +368,7 @@ class TestUart(UartTestCase):
                 ctx.set(rx.parity, self.parity)
 
                 for v in self.TEST_DATA:
-                    value = await self.stream_get(ctx, rx.stream)
+                    value = await self.stream_get(ctx, rx.stream_with_error)
                     mask = (1 << self.data_bits) - 1
                     self.assertEqual(value.data, v & mask)
                     self.assertFalse(value.error.framing)
@@ -380,11 +380,7 @@ class TestUart(UartTestCase):
         dut.submodules.rx = rx = self.set_up_rx()
         dut.submodules.tx = tx = self.set_up_tx()
 
-        dut.d.comb += [
-            tx.data.eq(rx.data.data),
-            tx.valid.eq(rx.valid),
-            rx.ready.eq(tx.ready),
-        ]
+        am.lib.wiring.connect(dut, rx.stream, tx.stream)
 
         with self.simulate(dut, traces=self.rx_traces(rx) + self.tx_traces(tx)) as sim:
             sim.add_clock(am.Period(Hz=115200 * 64))
@@ -404,7 +400,7 @@ class TestUart(UartTestCase):
             @sim.add_testbench
             async def middle_no_error(ctx):
                 for v in self.TEST_DATA:
-                    error, = await ctx.tick().sample(rx.data.error).until(rx.valid)
+                    error, = await ctx.tick().sample(rx.error).until(rx.valid)
                     self.assertFalse(error.framing)
                     self.assertFalse(error.parity)
                     self.assertFalse(error.overrun)
