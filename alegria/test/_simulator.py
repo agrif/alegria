@@ -6,6 +6,8 @@ import unittest
 import amaranth as am
 import amaranth.sim
 
+__all__ = ['SimulatorTestCase']
+
 class SimulatorTestCase(unittest.TestCase):
     @contextlib.contextmanager
     def simulate(self, module, *, deadline=None, traces=[], use_default_traces=True):

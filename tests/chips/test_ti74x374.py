@@ -2,10 +2,8 @@
 
 import amaranth as am
 
-from ..simulator import SimulatorTestCase
-from ..truth import TruthTable
-
 from alegria.chips import Ti74x374
+from alegria.test import SimulatorTestCase, TruthTable
 
 class TestTi74x374(SimulatorTestCase):
     def setUp(self):

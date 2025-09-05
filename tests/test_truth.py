@@ -1,6 +1,6 @@
 import unittest
 
-from .truth import TruthTable
+from alegria.test import TruthTable
 
 class TestMany(unittest.TestCase):
     def test_iter(self):

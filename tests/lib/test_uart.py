@@ -1,9 +1,8 @@
 import amaranth as am
 from parameterized import parameterized, parameterized_class
 
-from ..simulator import SimulatorTestCase
-
 from alegria.lib.uart import *
+from alegria.test import SimulatorTestCase
 
 # uart helpers
 class UartTestCase(SimulatorTestCase):

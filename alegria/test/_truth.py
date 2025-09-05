@@ -1,3 +1,5 @@
+__all__ = ['TruthTable']
+
 class TruthTable:
     class Many:
         def __init__(self, iterable):
