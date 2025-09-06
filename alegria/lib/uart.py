@@ -96,9 +96,17 @@ class Rx(am.lib.wiring.Component):
         return stream
 
     def elaborate(self, platform):
+        m = am.Module()
+
+        # this is just an alias
+        m.d.comb += [
+            self.data_with_error.data.eq(self.data),
+            self.data_with_error.error.eq(self.error),
+        ]
+
         # use a blackbox in cxxrtl simulation
         if _use_blackbox(platform):
-            return am.Instance(
+            m.submodules.box = am.Instance(
                 'cxxrtl_uart_rx',
                 p_MAX_BITS=self.max_bits,
                 i_clk=am.ClockSignal(),
@@ -107,14 +115,7 @@ class Rx(am.lib.wiring.Component):
                 i_ready=self.ready,
                 i_rts=self.rts,
             )
-
-        m = am.Module()
-
-        # this is just an alias
-        m.d.comb += [
-            self.data_with_error.data.eq(self.data),
-            self.data_with_error.error.eq(self.error),
-        ]
+            return m
 
         # get all of our external signals into the rxdomain
         if self.rxdomain == 'sync':
@@ -275,9 +276,11 @@ class Tx(am.lib.wiring.Component):
         return stream
 
     def elaborate(self, platform):
+        m = am.Module()
+
         # use a blackbox in cxxrtl simulation
         if _use_blackbox(platform):
-            return am.Instance(
+            m.submodules.box = am.Instance(
                 'cxxrtl_uart_tx',
                 p_MAX_BITS=self.max_bits,
                 i_clk=am.ClockSignal(),
@@ -285,8 +288,7 @@ class Tx(am.lib.wiring.Component):
                 i_valid=self.valid,
                 o_ready=self.ready,
             )
-
-        m = am.Module()
+            return m
 
         # get all of our external signals into the txdomain
         if self.txdomain == 'sync':
