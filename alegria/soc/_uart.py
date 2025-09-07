@@ -3,6 +3,7 @@ import amaranth.lib.wiring
 import amaranth_soc as amsoc
 import amaranth_soc.csr
 
+from .. import lib
 from ..lib import uart
 
 __all__ = ['Uart']
@@ -102,7 +103,8 @@ class Uart(am.lib.wiring.Component):
 
         # fifos
         m.submodules.rxfifo = rxfifo = am.lib.fifo.SyncFIFOBuffered(
-            width=uart.RxWithError(self._max_bits).size, depth=self._fifo_depth)
+            width=lib.DataWithError(self._max_bits, error=uart.RxError).size,
+            depth=self._fifo_depth)
         m.submodules.txfifo = txfifo = am.lib.fifo.SyncFIFOBuffered(
             width=self._max_bits, depth=self._fifo_depth)
 
@@ -128,7 +130,8 @@ class Uart(am.lib.wiring.Component):
         ]
 
         # read register
-        rxdata = uart.RxWithError(self._max_bits)(rxfifo.r_data)
+        rxdata = lib.DataWithError(self._max_bits, error=uart.RxError)(
+            rxfifo.r_data)
         m.d.comb += [
             rxfifo.r_en.eq(self._data.f.read.r_stb),
             self._data.f.read.r_data.eq(rxdata.data),

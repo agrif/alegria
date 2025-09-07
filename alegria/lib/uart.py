@@ -8,7 +8,13 @@ import amaranth.lib.stream
 import amaranth.lib.wiring
 
 import alegria.platforms
+from . import DataWithError
 from .clock_divider import ClockDivider
+
+__all__ = [
+    'StopBits', 'StopBitsView', 'Parity', 'ParityView', 'RxError',
+    'Rx', 'Tx',
+]
 
 # helper to add blackbox files to platform
 def _use_blackbox(platform):
@@ -42,14 +48,6 @@ class Parity(am.lib.enum.Enum, shape=2, view_class=ParityView):
     ODD = 0b01
     EVEN = 0b10
 
-class RxWithError(am.lib.data.StructLayout):
-    def __init__(self, max_bits):
-        self.max_bits = max_bits
-        super().__init__({
-            'data': max_bits,
-            'error': RxError,
-        })
-
 class RxError(am.lib.data.Struct):
     framing: 1
     overrun: 1
@@ -66,7 +64,7 @@ class Rx(am.lib.wiring.Component):
 
             'data': am.lib.wiring.Out(max_bits),
             'error': am.lib.wiring.Out(RxError),
-            'data_with_error': am.lib.wiring.Out(RxWithError(max_bits)),
+            'data_with_error': am.lib.wiring.Out(DataWithError(max_bits, error=RxError)),
             'valid': am.lib.wiring.Out(1),
             'ready': am.lib.wiring.In(1),
 
@@ -81,7 +79,7 @@ class Rx(am.lib.wiring.Component):
 
     @property
     def stream_with_error(self):
-        stream = am.lib.stream.Signature(RxWithError(self.max_bits)).create()
+        stream = am.lib.stream.Signature(DataWithError(self.max_bits, error=RxError)).create()
         stream.payload = self.data_with_error
         stream.valid = self.valid
         stream.ready = self.ready
