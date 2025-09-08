@@ -25,7 +25,7 @@ class SimulatorTestCase(unittest.TestCase):
                 am.Signal(name='top.clk'),
             ] + traces
 
-        vcd = os.getenv('ZOOBY_VCD')
+        vcd = os.getenv('ALEGRIA_VCD')
         if vcd:
             name = self.id()
             os.makedirs(vcd, exist_ok=True)
