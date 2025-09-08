@@ -5,16 +5,9 @@ import amaranth.lib.stream
 import amaranth.lib.wiring
 import amaranth.utils
 
-from . import DataWithError
+from . import DataWithError, Framed
 
-__all__ = ['Framed', 'Decoder', 'Encoder']
-
-class Framed(am.lib.data.StructLayout):
-    def __init__(self, bits=8):
-        super().__init__({
-            'data': bits,
-            'frame': 1,
-        })
+__all__ = ['Decoder', 'Encoder']
 
 class Decoder(am.lib.wiring.Component):
     def __init__(self, data_width=8, max_block_size=None, error=am.unsigned(1)):
@@ -30,13 +23,27 @@ class Decoder(am.lib.wiring.Component):
         self._frame_word = 0
 
         super().__init__({
-            'i_data': am.lib.wiring.In(DataWithError(data_width, error=error)),
+            'i_data': am.lib.wiring.In(data_width),
+            'i_error': am.lib.wiring.In(error),
             'i_valid': am.lib.wiring.In(1),
             'i_ready': am.lib.wiring.Out(1),
             'o_data': am.lib.wiring.Out(Framed(data_width)),
             'o_valid': am.lib.wiring.Out(1),
             'o_ready': am.lib.wiring.In(1),
         })
+
+    @property
+    def i_data_with_error(self):
+        return DataWithError(self.data_width, error=self.error)(
+            am.Cat(self.i_data, self.i_error))
+
+    @property
+    def i_stream_with_error(self):
+        stream = am.lib.stream.Signature(self.i_data_with_error.shape()).flip().create()
+        stream.payload = self.i_data_with_error
+        stream.valid = self.i_valid
+        stream.ready = self.i_ready
+        return stream
 
     @property
     def i_stream(self):
@@ -62,18 +69,18 @@ class Decoder(am.lib.wiring.Component):
         counter = am.Signal(range(self.max_block_size + 1))
 
         # always move data from in to out unless overwritten
-        m.d.comb += self.o_data.data.eq(self.i_data.data)
+        m.d.comb += self.o_data.data.eq(self.i_data)
 
         # counter always decrements on input word unless overwritten
         with m.If(self.i_ready):
             m.d.sync += counter.eq(counter - 1)
 
-        with m.If(self.i_valid & self.i_data.error.any()):
+        with m.If(self.i_valid & self.i_error.any()):
             # input is valid, but has an error, reset and skip
             m.d.sync += found_frame.eq(0)
             m.d.comb += self.i_ready.eq(1)
 
-        with m.Elif(self.i_valid & (self.i_data.data == self._frame_word)):
+        with m.Elif(self.i_valid & (self.i_data == self._frame_word)):
             # this is a new frame word, start over
             # push out a frame indicator
             m.d.comb += [
@@ -99,7 +106,7 @@ class Decoder(am.lib.wiring.Component):
 
             with m.Else():
                 # stuffed word
-                with m.If(self.i_data.data > self.max_block_size):
+                with m.If(self.i_data > self.max_block_size):
                     # bad block size, we've lost the frame
                     m.d.sync += found_frame.eq(0)
                     # skip this word
@@ -108,9 +115,9 @@ class Decoder(am.lib.wiring.Component):
                     # good block size, set counter when this word is consumed
                     with m.If(self.i_ready):
                         m.d.sync += [
-                            insert_word.eq(self.i_data.data != self.max_block_size),
+                            insert_word.eq(self.i_data != self.max_block_size),
                             # -1 because the current word counts also
-                            counter.eq(self.i_data.data - 1),
+                            counter.eq(self.i_data - 1),
                         ]
                     # output a frame word here if requested
                     with m.If(insert_word):

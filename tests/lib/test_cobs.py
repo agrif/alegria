@@ -162,7 +162,7 @@ class CobsTestCase(SimulatorTestCase):
                 for b in enc:
                     if self.write_delay:
                         await ctx.tick().repeat(self.write_delay)
-                    await self.stream_put(ctx, dut.i_stream, {'data': b, 'error': 0})
+                    await self.stream_put(ctx, dut.i_stream, b)
 
             @sim.add_testbench
             async def read(ctx):
@@ -194,7 +194,7 @@ class CobsTestCase(SimulatorTestCase):
     def run_encoder_decoder_on(self, frames):
         dut = am.Module()
         dut.submodules.encoder = dut_enc = self.set_up_encoder()
-        dut.submodules.decoder = dut_dec = self.set_up_decoder(error=0)
+        dut.submodules.decoder = dut_dec = self.set_up_decoder()
         am.lib.wiring.connect(dut, dut_enc.o_stream, dut_dec.i_stream)
         enc, dec = self.encoded_decoded(frames, header=0)
         traces = self.encoder_traces(dut_enc) + self.decoder_traces(dut_dec)
@@ -231,7 +231,7 @@ class CobsTestCase(SimulatorTestCase):
                 for b in enc:
                     if self.write_delay:
                         await ctx.tick().repeat(self.write_delay)
-                    await self.stream_put(ctx, dut_dec.i_stream, {'data': b, 'error': 0})
+                    await self.stream_put(ctx, dut_dec.i_stream, b)
 
             @sim.add_testbench
             async def read(ctx):

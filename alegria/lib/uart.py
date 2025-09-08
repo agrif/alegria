@@ -64,7 +64,6 @@ class Rx(am.lib.wiring.Component):
 
             'data': am.lib.wiring.Out(max_bits),
             'error': am.lib.wiring.Out(RxError),
-            'data_with_error': am.lib.wiring.Out(DataWithError(max_bits, error=RxError)),
             'valid': am.lib.wiring.Out(1),
             'ready': am.lib.wiring.In(1),
 
@@ -76,6 +75,11 @@ class Rx(am.lib.wiring.Component):
             # used for simulation
             'rts': am.lib.wiring.In(1, init=1),
         })
+
+    @property
+    def data_with_error(self):
+        return DataWithError(self.max_bits, error=RxError)(
+            am.Cat(self.data, self.error))
 
     @property
     def stream_with_error(self):
@@ -95,12 +99,6 @@ class Rx(am.lib.wiring.Component):
 
     def elaborate(self, platform):
         m = am.Module()
-
-        # this is just an alias
-        m.d.comb += [
-            self.data_with_error.data.eq(self.data),
-            self.data_with_error.error.eq(self.error),
-        ]
 
         # use a blackbox in cxxrtl simulation
         if _use_blackbox(platform):
