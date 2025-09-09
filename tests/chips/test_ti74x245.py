@@ -46,10 +46,11 @@ class TestTi74x245(SimulatorTestCase):
         )
 
         p = am.Period(us=1)
-        with self.simulate(self.dut, traces=self.traces) as sim:
+        with self.simulate(self.dut, traces=self.traces, deadline=10*p) as sim:
             @sim.add_testbench
             async def bench(ctx):
                 for row in table:
+                    sim.reset_deadline()
                     for k, v in row.items():
                         if k in outputs:
                             continue

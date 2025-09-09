@@ -160,6 +160,7 @@ class CobsTestCase(SimulatorTestCase):
                 await ctx.tick().repeat(3)
 
                 for b in enc:
+                    sim.reset_deadline()
                     if self.write_delay:
                         await ctx.tick().repeat(self.write_delay)
                     await self.stream_put(ctx, dut.i_stream, b)
@@ -167,13 +168,14 @@ class CobsTestCase(SimulatorTestCase):
             @sim.add_testbench
             async def read(ctx):
                 for frame in dec:
+                    sim.reset_deadline()
                     value = await self.frame_read(ctx, dut.o_stream)
                     self.assertEqual(value, frame)
 
     def run_encoder_on(self, frames):
         dut = self.set_up_encoder()
         enc, dec = self.encoded_decoded(frames, header=0)
-        with self.simulate(dut, traces=self.encoder_traces(dut)) as sim:
+        with self.simulate(dut, traces=self.encoder_traces(dut), deadline=3000) as sim:
             sim.add_clock(am.Period(Hz=1_000_000))
 
             @sim.add_testbench
@@ -181,11 +183,13 @@ class CobsTestCase(SimulatorTestCase):
                 await ctx.tick().repeat(3)
 
                 for frame in dec:
+                    sim.reset_deadline()
                     await self.frame_write(ctx, dut.i_stream, frame)
 
             @sim.add_testbench
             async def read(ctx):
                 for b in enc:
+                    sim.reset_deadline()
                     if self.read_delay:
                         await ctx.tick().repeat(self.read_delay)
                     value = await self.stream_get(ctx, dut.o_stream)
@@ -198,7 +202,7 @@ class CobsTestCase(SimulatorTestCase):
         am.lib.wiring.connect(dut, dut_enc.o_stream, dut_dec.i_stream)
         enc, dec = self.encoded_decoded(frames, header=0)
         traces = self.encoder_traces(dut_enc) + self.decoder_traces(dut_dec)
-        with self.simulate(dut, traces=traces) as sim:
+        with self.simulate(dut, traces=traces, deadline=6000) as sim:
             sim.add_clock(am.Period(Hz=1_000_000))
 
             @sim.add_testbench
@@ -206,11 +210,13 @@ class CobsTestCase(SimulatorTestCase):
                 await ctx.tick().repeat(3)
 
                 for frame in dec:
+                    sim.reset_deadline()
                     await self.frame_write(ctx, dut_enc.i_stream, frame)
 
             @sim.add_testbench
             async def read(ctx):
                 for frame in dec:
+                    sim.reset_deadline()
                     value = await self.frame_read(ctx, dut_dec.o_stream)
                     self.assertEqual(value, frame)
 
@@ -229,6 +235,7 @@ class CobsTestCase(SimulatorTestCase):
                 await ctx.tick().repeat(3)
 
                 for b in enc:
+                    sim.reset_deadline()
                     if self.write_delay:
                         await ctx.tick().repeat(self.write_delay)
                     await self.stream_put(ctx, dut_dec.i_stream, b)
@@ -236,6 +243,7 @@ class CobsTestCase(SimulatorTestCase):
             @sim.add_testbench
             async def read(ctx):
                 for b in enc[self.header:]:
+                    sim.reset_deadline()
                     if self.read_delay:
                         await ctx.tick().repeat(self.read_delay)
                     value = await self.stream_get(ctx, dut_enc.o_stream)

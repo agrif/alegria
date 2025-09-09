@@ -8,17 +8,44 @@ import amaranth.sim
 
 __all__ = ['SimulatorTestCase']
 
+# cheeky way to sneak extra functionality in to test as needed
+class Simulator(am.sim.Simulator):
+    def __init__(self, *args, **kwargs):
+        self._deadline_ignore = False
+        super().__init__(*args, **kwargs)
+
+    def reset_deadline(self) -> None:
+        self._deadline_ignore = True
+
 class SimulatorTestCase(unittest.TestCase):
     @contextlib.contextmanager
-    def simulate(self, module, *, deadline=None, traces=[], use_default_traces=True):
-        sim = am.sim.Simulator(module)
-        yield sim
+    def simulate(
+            self, module, *,
+            deadline=1000,
+            deadline_domain='sync',
+            traces=[],
+            use_default_traces=True,
+    ):
+        if not isinstance(deadline, (am.Period, int)):
+            raise TypeError('deadline must be a amaranth.Period or int')
 
-        def run():
-            if deadline is None:
-                sim.run()
-            else:
-                sim.run_until(deadline)
+        sim = Simulator(module)
+
+        @sim.add_process
+        async def deadline_checker(ctx):
+            while True:
+                # it would be nice to reset this wait whenever
+                # reset_deadline() is called, but this is ok
+                if isinstance(deadline, am.Period):
+                    await ctx.delay(deadline)
+                else:
+                    await ctx.tick().repeat(deadline)
+                if sim._deadline_ignore:
+                    sim._deadline_ignore = False
+                else:
+                    self.fail('simulation deadline reached')
+
+        yield sim
 
         if use_default_traces:
             traces = [
@@ -33,9 +60,9 @@ class SimulatorTestCase(unittest.TestCase):
             gtkw_file = os.path.join(vcd, name + '.gtkw')
 
             with sim.write_vcd(vcd_file, gtkw_file, traces=[] + traces):
-                run()
+                sim.run()
         else:
-            run()
+            sim.run()
 
     # from amaranth docs, helpers for streams
     @staticmethod

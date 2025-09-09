@@ -29,10 +29,11 @@ class TestTi74x04(SimulatorTestCase):
             [gate for _ in range(6)],
         )
         p = am.Period(us=1)
-        with self.simulate(self.dut, traces=self.traces) as sim:
+        with self.simulate(self.dut, traces=self.traces, deadline=10*p) as sim:
             @sim.add_testbench
             async def bench(ctx):
                 for row in table:
+                    sim.reset_deadline()
                     for i, pins in row.items():
                         for k, v in pins.items():
                             if k == 'y':

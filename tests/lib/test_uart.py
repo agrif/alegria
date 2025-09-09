@@ -179,6 +179,7 @@ class TestUart(UartTestCase):
                 await ctx.tick().repeat(3)
 
                 for v in self.TEST_DATA:
+                    sim.reset_deadline()
                     await self.stream_put(ctx, dut.stream, v)
 
             @sim.add_testbench
@@ -208,6 +209,7 @@ class TestUart(UartTestCase):
                 ctx.set(dut.parity, self.parity)
 
                 for v in self.TEST_DATA:
+                    sim.reset_deadline()
                     value = await self.stream_get(ctx, dut.stream_with_error)
                     mask = (1 << self.data_bits) - 1
                     self.assertEqual(value.data, v & mask)
@@ -238,6 +240,7 @@ class TestUart(UartTestCase):
                 ctx.set(dut.parity, self.parity)
 
                 for i, v in enumerate(parity_data):
+                    sim.reset_deadline()
                     value = await self.stream_get(ctx, dut.stream_with_error)
                     mask = (1 << self.data_bits) - 1
                     self.assertEqual(value.data, v & mask)
@@ -274,6 +277,7 @@ class TestUart(UartTestCase):
                 ctx.set(dut.parity, self.parity)
 
                 for stops in stop_patterns:
+                    sim.reset_deadline()
                     expected = stops != [1, 1]
                     if self.stop_bits == StopBits.STOP_1:
                         expected = not stops[0]
@@ -307,6 +311,7 @@ class TestUart(UartTestCase):
 
                 last_v = self.TEST_DATA[0]
                 for i, v in enumerate(self.TEST_DATA):
+                    sim.reset_deadline()
                     if i % 3 == 0:
                         # over-estimate
                         wait_bits = 1 + self.data_bits + 1
@@ -357,6 +362,7 @@ class TestUart(UartTestCase):
                 await ctx.tick().repeat(3)
 
                 for v in self.TEST_DATA:
+                    sim.reset_deadline()
                     await self.stream_put(ctx, tx.stream, v)
 
             @sim.add_testbench
@@ -394,6 +400,7 @@ class TestUart(UartTestCase):
                 await ctx.tick().repeat(3)
 
                 for v in self.TEST_DATA:
+                    sim.reset_deadline()
                     await self.uart_write(ctx, rx.rx, v)
 
             @sim.add_testbench
