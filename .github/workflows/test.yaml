@@ -1,0 +1,30 @@
+name: Test
+on: [push]
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Print Python Version
+        run: python3 -V
+
+      - name: Install Dependencies
+        run: pip3 install --no-deps -r requirements.txt
+
+      - name: Run Tests
+        run: python3 -m alegria.test -v --write-vcds=alegria-test-vcds/
+
+      - name: Upload VCDs
+        uses: actions/upload-artifact@v4
+        with:
+          name: alegria-test-vcds
+          path: alegria-test-vcds/
