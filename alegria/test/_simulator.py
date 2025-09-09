@@ -52,7 +52,9 @@ class SimulatorTestCase(unittest.TestCase):
                 am.Signal(name='top.clk'),
             ] + traces
 
+        # this may also be set in cli.py, with --write-vcds=...
         vcd = os.getenv('ALEGRIA_VCD')
+
         if vcd:
             name = self.id()
             os.makedirs(vcd, exist_ok=True)

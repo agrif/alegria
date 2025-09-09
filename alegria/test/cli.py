@@ -16,6 +16,7 @@ class TestProgram(unittest.TestProgram):
             parallel_level=ParallelTextTestRunner.Level.CASE,
             parallel_jobs=None,
             parallel_batch=1,
+            vcd_directory=None,
             **kwargs):
 
         if testRunner is None:
@@ -23,6 +24,10 @@ class TestProgram(unittest.TestProgram):
 
         class TestRunnerInjector(testRunner):
             def __init__(runner_self, **kwargs):
+                if self.vcd_directory is not None:
+                    # something of a hack, keep in sync with _simulation.py
+                    os.environ['ALEGRIA_VCD'] = self.vcd_directory
+
                 super().__init__(
                     level=self.parallel_level,
                     processes=self.parallel_jobs,
@@ -33,6 +38,7 @@ class TestProgram(unittest.TestProgram):
         self.parallel_level = parallel_level
         self.parallel_jobs = parallel_jobs
         self.parallel_batch = parallel_batch
+        self.vcd_directory = vcd_directory
         super().__init__(
             testRunner=TestRunnerInjector,
             **kwargs,
@@ -52,6 +58,9 @@ class TestProgram(unittest.TestProgram):
         parser.add_argument('--parallel-batch', dest='parallel_batch',
                             metavar='N', type=int, default=self.parallel_batch,
                             help='Batch tests up N at a time')
+        parser.add_argument('--write-vcds', dest='vcd_directory',
+                            metavar='DIR', default=self.vcd_directory,
+                            help='Write VCD waveforms to DIR')
 
         return parser
 
