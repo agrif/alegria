@@ -39,7 +39,11 @@ class SimulatorTestCase(unittest.TestCase):
                 if isinstance(deadline, am.Period):
                     await ctx.delay(deadline)
                 else:
-                    await ctx.tick().repeat(deadline)
+                    # ctx.tick().repeat(deadline) has issues on 3.12
+                    # https://github.com/amaranth-lang/amaranth/pull/1590#issuecomment-3272498665
+                    for _ in range(deadline):
+                        await ctx.tick()
+
                 if sim._deadline_ignore:
                     sim._deadline_ignore = False
                 else:
