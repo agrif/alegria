@@ -79,7 +79,7 @@ class Decoder(am.lib.wiring.Component):
         with m.If(self.i_ready):
             m.d.sync += counter.eq(counter - 1)
 
-        with m.If(self.i_valid & self.i_error.any()):
+        with m.If(self.i_valid & am.Value.cast(self.i_error).any()):
             # input is valid, but has an error, reset and skip
             m.d.sync += found_frame.eq(0)
             m.d.comb += self.i_ready.eq(1)
