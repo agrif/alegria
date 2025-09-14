@@ -23,8 +23,8 @@ class Decoder(am.lib.wiring.Component):
         self._frame_word = 0
 
         super().__init__({
-            'i_data': am.lib.wiring.In(data_width),
-            'i_error': am.lib.wiring.In(error),
+            'i_data_with_error': am.lib.wiring.In(DataWithError(
+                data_width, error=error)),
             'i_valid': am.lib.wiring.In(1),
             'i_ready': am.lib.wiring.Out(1),
             'o_data': am.lib.wiring.Out(Framed(data_width)),
@@ -33,9 +33,12 @@ class Decoder(am.lib.wiring.Component):
         })
 
     @property
-    def i_data_with_error(self):
-        return DataWithError(self.data_width, error=self.error)(
-            am.Cat(self.i_data, self.i_error))
+    def i_data(self):
+        return self.i_data_with_error.data
+
+    @property
+    def i_error(self):
+        return self.i_data_with_error.error
 
     @property
     def i_stream_with_error(self):
@@ -45,13 +48,14 @@ class Decoder(am.lib.wiring.Component):
         stream.ready = self.i_ready
         return stream
 
-    @property
-    def i_stream(self):
-        stream = am.lib.stream.Signature(self.i_data.shape()).flip().create()
-        stream.payload = self.i_data
-        stream.valid = self.i_valid
-        stream.ready = self.i_ready
-        return stream
+    # does not work, am.lib.wiring.connect expects signals not slices
+    #@property
+    #def i_stream(self):
+    #    stream = am.lib.stream.Signature(self.i_data.shape()).flip().create()
+    #    stream.payload = self.i_data
+    #    stream.valid = self.i_valid
+    #    stream.ready = self.i_ready
+    #    return stream
 
     @property
     def o_stream(self):

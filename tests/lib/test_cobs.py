@@ -139,7 +139,7 @@ class CobsTestCase(SimulatorTestCase):
 
     def decoder_traces(self, dec):
         return [
-            dec.i_stream,
+            dec.i_stream_with_error,
             dec.o_stream,
         ]
 
@@ -163,7 +163,8 @@ class CobsTestCase(SimulatorTestCase):
                     sim.reset_deadline()
                     if self.write_delay:
                         await ctx.tick().repeat(self.write_delay)
-                    await self.stream_put(ctx, dut.i_stream, b)
+                    await self.stream_put(ctx, dut.i_stream_with_error,
+                                          {'data': b, 'error': 0})
 
             @sim.add_testbench
             async def read(ctx):
@@ -199,7 +200,14 @@ class CobsTestCase(SimulatorTestCase):
         dut = am.Module()
         dut.submodules.encoder = dut_enc = self.set_up_encoder()
         dut.submodules.decoder = dut_dec = self.set_up_decoder()
-        am.lib.wiring.connect(dut, dut_enc.o_stream, dut_dec.i_stream)
+
+        #am.lib.wiring.connect(dut, dut_enc.o_stream, dut_dec.i_stream)
+        dut.d.comb += [
+            dut_dec.i_data.eq(dut_enc.o_data),
+            dut_dec.i_valid.eq(dut_enc.o_valid),
+            dut_enc.o_ready.eq(dut_dec.i_ready),
+        ]
+
         enc, dec = self.encoded_decoded(frames, header=0)
         traces = self.encoder_traces(dut_enc) + self.decoder_traces(dut_dec)
         with self.simulate(dut, traces=traces, deadline=6000) as sim:
@@ -238,7 +246,8 @@ class CobsTestCase(SimulatorTestCase):
                     sim.reset_deadline()
                     if self.write_delay:
                         await ctx.tick().repeat(self.write_delay)
-                    await self.stream_put(ctx, dut_dec.i_stream, b)
+                    await self.stream_put(ctx, dut_dec.i_stream_with_error,
+                                          {'data': b, 'error': 0})
 
             @sim.add_testbench
             async def read(ctx):
