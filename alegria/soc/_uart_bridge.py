@@ -1,4 +1,5 @@
 import amaranth as am
+import amaranth.build
 import amaranth.lib.enum
 import amaranth.lib.wiring
 import amaranth.utils
@@ -17,15 +18,24 @@ class UartBridge(am.lib.wiring.Component):
         WAIT_END = am.lib.enum.auto()
         COMMAND = am.lib.enum.auto()
 
+        RESET_SET = am.lib.enum.auto()
+
         READ_ADDRESS = am.lib.enum.auto()
         READ_LENGTH = am.lib.enum.auto()
-        READ_FETCH = am.lib.enum.auto()
+        READ_LOAD = am.lib.enum.auto()
         READ_OUTPUT = am.lib.enum.auto()
 
-    class _Command(am.lib.enum.Enum):
+        WRITE_ADDRESS = am.lib.enum.auto()
+        WRITE_DATA = am.lib.enum.auto()
+        WRITE_STORE = am.lib.enum.auto()
+        WRITE_OUTPUT = am.lib.enum.auto()
+
+    class Command(am.lib.enum.Enum):
         PING = 0
         ERROR = 1
-        READ = 2
+        RESET = 2
+        READ = 3
+        WRITE = 4
 
     def __init__(self, *, addr_width, data_width, granularity=None,
                  features=frozenset(), fifo_depth=16, divisor=None,
@@ -49,6 +59,7 @@ class UartBridge(am.lib.wiring.Component):
             'bus': am.lib.wiring.Out(amsoc.wishbone.Signature(
                 addr_width=addr_width, data_width=data_width,
                 granularity=granularity, features=features)),
+            'reset': am.lib.wiring.Out(1),
             'rx': am.lib.wiring.In(1),
             'tx': am.lib.wiring.Out(1),
         })
@@ -60,7 +71,11 @@ class UartBridge(am.lib.wiring.Component):
         # (does not work if we're not running on default clock!)
         divisor = self._divisor
         if divisor is None:
-            divisor = int(round(platform.default_clk_period.hertz / 115200))
+            if isinstance(platform, am.build.Platform):
+                divisor = int(round(platform.default_clk_period.hertz / 115200))
+
+        if divisor is None:
+            raise ValueError('could not guess divisor for uart')
 
         # uarts
         m.submodules.rx = rx = uart.Rx(max_divisor=divisor)
@@ -134,6 +149,8 @@ class UartBridge(am.lib.wiring.Component):
             # bus access are usually full-width, done at address
             self.bus.sel.eq(-1),
             self.bus.adr.eq(address),
+            # when we write data it's from here
+            self.bus.dat_w.eq(data),
         ]
 
         with m.Switch(state):
@@ -160,8 +177,10 @@ class UartBridge(am.lib.wiring.Component):
                 with m.If(i_valid & ~i_frame):
                     # figure out a response, case by case, and send it on ready
                     # then transition to next state
-                    response = am.Signal(self._Command, init=self._Command.ERROR)
-                    next_state = am.Signal(self._State, init=self._State.WAIT_END)
+                    response = am.Signal(self.Command, init=self.Command.ERROR)
+                    next_state = am.Signal(
+                        self._State, init=self._State.WAIT_END)
+
                     m.d.comb += [
                         o_data.eq(response),
                         o_valid.eq(1),
@@ -175,18 +194,43 @@ class UartBridge(am.lib.wiring.Component):
 
                     # case by case response
                     with m.Switch(i_data):
-                        with m.Case(self._Command.PING):
+                        with m.Case(self.Command.PING):
                             m.d.comb += [
-                                response.eq(self._Command.PING),
+                                response.eq(self.Command.PING),
                                 next_state.eq(self._State.WAIT_END),
                             ]
-                        with m.Case(self._Command.READ):
+                        with m.Case(self.Command.RESET):
                             m.d.comb += [
-                                response.eq(self._Command.READ),
+                                response.eq(self.Command.RESET),
+                                next_state.eq(self._State.RESET_SET),
+                            ]
+                        with m.Case(self.Command.READ):
+                            m.d.comb += [
+                                response.eq(self.Command.READ),
                                 next_state.eq(self._State.READ_ADDRESS),
                             ]
+                        with m.Case(self.Command.WRITE):
+                            m.d.comb += [
+                                response.eq(self.Command.WRITE),
+                                next_state.eq(self._State.WRITE_ADDRESS),
+                            ]
 
-            with m.Case(self._State.READ_ADDRESS):
+            with m.Case(self._State.RESET_SET):
+                # copy flag out, set reset when ready
+                with m.If(i_valid & ~i_frame):
+                    m.d.comb += [
+                        o_data.eq(i_data.any()),
+                        o_valid.eq(1),
+                        i_ready.eq(o_ready),
+                    ]
+                    with m.If(o_ready):
+                        m.d.sync += [
+                            self.reset.eq(i_data.any()),
+                            state.eq(self._State.WAIT_END),
+                        ]
+
+            # double up, these states do basically the same thing
+            with m.Case(self._State.READ_ADDRESS, self._State.WRITE_ADDRESS):
                 # copy bytes out and read into address when ready
                 with m.If(i_valid & ~i_frame):
                     m.d.comb += [
@@ -194,35 +238,37 @@ class UartBridge(am.lib.wiring.Component):
                         o_valid.eq(1),
                         i_ready.eq(o_ready),
                     ]
+                    # if this is the first address byte, mask align bits
+                    # in reply
+                    with m.If(address_byte == 0):
+                        m.d.comb += o_data[:self._addr_align].eq(0)
                     with m.If(o_ready):
                         m.d.sync += [
                             address_byte.eq(address_byte + 1),
                             address.eq(address >> 8),
                             address[-8:].eq(i_data),
                         ]
-                        # if this is the first address byte, mask align bits
-                        # in reply
-                        with m.If(address_byte == 0):
-                            m.d.comb += o_data[:self._addr_align].eq(0)
                         # if this is the last address byte, move on
                         with m.If(address_byte.all()):
-                            m.d.sync += state.eq(self._State.READ_LENGTH)
+                            with m.If(state.matches(self._State.READ_ADDRESS)):
+                                m.d.sync += state.eq(self._State.READ_LENGTH)
+                            with m.Else(): # WRITE_ADDRESS
+                                m.d.sync += [
+                                    state.eq(self._State.WRITE_DATA),
+                                    length.eq(0),
+                                    data_byte.eq(0),
+                                ]
 
             with m.Case(self._State.READ_LENGTH):
-                # copy one byte out and read into length when ready
+                # read into length, do not copy out
+                m.d.comb += i_ready.eq(1)
                 with m.If(i_valid & ~i_frame):
-                    m.d.comb += [
-                        o_data.eq(i_data),
-                        o_valid.eq(1),
-                        i_ready.eq(o_ready),
+                    m.d.sync += [
+                        length.eq(i_data),
+                        state.eq(self._State.READ_LOAD),
                     ]
-                    with m.If(o_ready):
-                        m.d.sync += [
-                            length.eq(i_data),
-                            state.eq(self._State.READ_FETCH),
-                        ]
 
-            with m.Case(self._State.READ_FETCH):
+            with m.Case(self._State.READ_LOAD):
                 # read some data, continue on ack
                 m.d.comb += [
                     self.bus.cyc.eq(1),
@@ -252,7 +298,7 @@ class UartBridge(am.lib.wiring.Component):
                     # if we're at the end, read another
                     with m.If(data_byte.all()):
                         m.d.sync += [
-                            state.eq(self._State.READ_FETCH),
+                            state.eq(self._State.READ_LOAD),
                             address.eq(address + 1),
                             length.eq(length - 1),
                         ]
@@ -260,16 +306,64 @@ class UartBridge(am.lib.wiring.Component):
                         with m.If(length == 0):
                             m.d.sync += state.eq(self._State.WAIT_END)
 
-        # catch all frame boundaries outside WAIT_START and memory states
-        with m.If(~state.matches(self._State.WAIT_START, self._State.READ_FETCH, self._State.READ_OUTPUT)):
+            with m.Case(self._State.WRITE_DATA):
+                # read into data, do not copy out
                 with m.If(i_valid & i_frame):
-                    # end output frame and transition to WAIT_START on ready
-                    m.d.comb += [
-                        o_frame.eq(1),
-                        o_valid.eq(1),
-                        i_ready.eq(o_ready),
+                    # no more data, jump to end
+                    m.d.sync += state.eq(self._State.WRITE_OUTPUT)
+                # still more data
+                with m.If(i_valid & ~i_frame):
+                    m.d.comb += i_ready.eq(1)
+                    m.d.sync += [
+                        data_byte.eq(data_byte + 1),
+                        data.eq(data >> 8),
+                        data[-8:].eq(i_data),
                     ]
-                    with m.If(o_ready):
-                        m.d.sync += state.eq(self._State.WAIT_START)
+                    # if this is the last data byte, move on
+                    with m.If(data_byte.all()):
+                        m.d.sync += state.eq(self._State.WRITE_STORE)
+
+            with m.Case(self._State.WRITE_STORE):
+                # write some data, continue on ack
+                m.d.comb += [
+                    self.bus.cyc.eq(1),
+                    self.bus.stb.eq(1),
+                    self.bus.we.eq(1),
+                    self.bus.sel.eq(-1),
+                    self.bus.adr.eq(address),
+                    self.bus.dat_w.eq(data),
+                ]
+                with m.If(self.bus.ack):
+                    m.d.sync += [
+                        state.eq(self._State.WRITE_DATA),
+                        address.eq(address + 1),
+                        length.eq(length + 1),
+                    ]
+
+            with m.Case(self._State.WRITE_OUTPUT):
+                # write the amount written to output
+                m.d.comb += [
+                    o_data.eq(length),
+                    o_valid.eq(1),
+                ]
+                with m.If(o_ready):
+                    m.d.sync += state.eq(self._State.WAIT_END)
+
+        # catch all frame boundaries in states that read from i_data
+        # except WAIT_START and WRITE_DATA which both handle themselves
+        with m.If(state.matches(
+                self._State.WAIT_END, self._State.COMMAND,
+                self._State.RESET_SET, self._State.READ_ADDRESS,
+                self._State.READ_LENGTH, self._State.WRITE_ADDRESS)):
+
+            with m.If(i_valid & i_frame):
+                # end output frame and transition to WAIT_START on ready
+                m.d.comb += [
+                    o_frame.eq(1),
+                    o_valid.eq(1),
+                    i_ready.eq(o_ready),
+                ]
+                with m.If(o_ready):
+                    m.d.sync += state.eq(self._State.WAIT_START)
 
         return m
