@@ -44,8 +44,8 @@ namespace cxxrtl_design {
                     this->p_valid.next.data[0] = 0;
                 }
 
-                // check for new character if next cycle is open
-                if (!this->p_valid.next.data[0] && this->p_rts.data[0]) {
+                // check for new character if next cycle is open and not reset
+                if (!this->p_rst.data[0] && !this->p_valid.next.data[0] && this->p_rts.data[0]) {
                     char c;
                     ssize_t bytes_read = read(fd, &c, 1);
                     if (bytes_read > 0) {
@@ -75,11 +75,15 @@ namespace cxxrtl_design {
     struct cxxrtl_uart_tx_stdout : public bb_p_cxxrtl__uart__tx<MAX_BITS> {
         bool eval(performer *performer) override {
             if (this->posedge_p_clk()) {
-                // always ready
-                this->p_ready.next.data[0] = 0x1;
+                // always ready if not reset
+                if (this->p_rst.data[0]) {
+                    this->p_ready.next.data[0] = 0;
+                } else {
+                    this->p_ready.next.data[0] = 1;
+                }
 
                 // check if output is present and execute
-                if (this->p_valid.data[0]) {
+                if (this->p_valid.data[0] && this->p_ready.curr.data[0]) {
                     unsigned char c = this->p_data.data[0] & 0xff;
                     std::cout << c;
                     std::cout.flush();
