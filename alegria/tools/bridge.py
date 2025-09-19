@@ -148,6 +148,21 @@ class Bridge:
             amount -= size
             yield chunk
 
+    def read_c_string(self, address, amount=0x1000):
+        data = b''
+        for chunk in self.read_c_string_in_chunks(address, amount=amount):
+            data += chunk
+        return data
+
+    def read_c_string_in_chunks(self, address, amount=0x1000):
+        for chunk in self.read_bytes_in_chunks(address, amount):
+            idx = chunk.find(b'\x00')
+            if idx >= 0:
+                yield chunk[:idx]
+                break
+            else:
+                yield chunk
+
     def write_words(self, address, words):
         self.write_words_in_chunks(address, [words])
 
@@ -204,6 +219,170 @@ class Bridge:
                 assert len(data) == 0
                 break
 
+    class RttControl:
+        def __init__(self, bridge, address):
+            self._bridge = bridge
+            self._address = address
+
+            after_id = address + 16
+            self._up_size, self._down_size = bridge.read_words(after_id, 2)
+
+            self._channel_size = 6 * bridge.word_size;
+            self._up = after_id + 2 * bridge.word_size
+            self._down = self._up + self._up_size * self._channel_size
+
+        def __repr__(self):
+            meta = ', '.join(f'{k}={v}' for k, v in dict(
+                address = f'0x{self._address:08x}',
+                up = self._up_size,
+                down = self._down_size,
+            ).items())
+            return f'{self.__class__.__name__}({meta})'
+
+        def _get_channel(self, base, i, check=True):
+            channel = self._bridge.RttChannel(
+                self._bridge, base + i * self._channel_size)
+            if not channel._buffer_ptr:
+                if check:
+                    raise RuntimeError(f'channel {i} not allocated')
+                return None
+            return channel
+
+        def get_up(self, i):
+            return self._get_channel(self._up, i)
+
+        def get_down(self, i):
+            return self._get_channel(self._down, i)
+
+        def iter_ups(self):
+            for i in range(self._up_size):
+                channel = self._get_channel(self._up, i)
+                if channel:
+                    yield channel
+
+        def iter_downs(self):
+            for i in range(self._down_size):
+                channel = self._get_channel(self._down, i)
+                if channel:
+                    yield channel
+
+    class RttChannel:
+        _MODE_SKIP  = 0x0
+        _MODE_TRIM  = 0x1
+        _MODE_BLOCK = 0x2
+        _MODE_MASK  = 0x3
+
+        def __init__(self, bridge, address):
+            self._bridge = bridge
+            self._address = address
+
+            self._write_addr = address + 3 * bridge.word_size
+            self._read_addr = address + 4 * bridge.word_size
+
+            self._update(fast=False)
+
+        def __repr__(self):
+            meta = ', '.join(f'{k}={v}' for k, v in dict(
+                name = self.name,
+            ).items())
+            return f'{self.__class__.__name__}({meta})'
+
+        def _update(self, fast=True):
+            words = self._bridge.read_words(self._address, 6)
+            self._name_ptr = words[0]
+            self._buffer_ptr = words[1]
+            self._size = words[2]
+            self._write = words[3]
+            self._read = words[4]
+            self._flags = words[5]
+
+            if not fast:
+                if self._name_ptr:
+                    self.name = self._bridge.read_c_string(self._name_ptr)
+                else:
+                    self.name = None
+
+        def _read_buffer(self):
+            assert self._buffer_ptr
+            return self._bridge.read_bytes(self._buffer_ptr, self._size)
+
+        def _write_buffer(self, buf):
+            assert self._buffer_ptr
+            assert self._size == len(buf)
+            return self._bridge.write_bytes(self._buffer_ptr, buf)
+
+        def _wrap_amount(self, amt):
+            if amt < 0:
+                amt += self._size
+            return amt
+
+        def get_data(self, update=True):
+            if update:
+                self._update()
+            return self._wrap_amount(self._write - self._read)
+
+        def get_space(self, update=True):
+            if update:
+                self._update()
+            return self._wrap_amount(self._read - self._write - 1)
+
+        def getchar(self, wait=True):
+            self._update()
+            if wait:
+                # wait until available
+                while self._read == self._write:
+                    time.sleep(0.01)
+                    self._update()
+
+            if self._read == self._write:
+                return None
+
+            c = self._read_buffer()[self._read:self._read + 1]
+            self._read = (self._read + 1) % self._size
+            self._bridge.write_words(self._read_addr, [self._read])
+
+            return c
+
+        def read(self, amount=None):
+            self._update()
+            available = self.get_data(False)
+
+            if amount is None:
+                amount = available
+
+            data = b''
+            while len(data) < amount:
+                available = self.get_data(False)
+                buf = self._read_buffer()
+                amount_now = available if amount > available else amount
+                data += (buf + buf)[self._read:self._read + amount_now]
+                self._read = (self._read + amount_now) % self._size
+                self._bridge.write_words(self._read_addr, [self._read])
+
+                if len(data) >= amount:
+                    return data
+
+                time.sleep(0.01)
+                self._update()
+
+    def find_rtt(self, address=None, start=0, end=1 << 32):
+        if address is None:
+            magic = b'SEGGER RTT\0\0\0\0\0\0'
+            chunk_end = b''
+            address = start
+            for chunk in self.read_bytes_in_chunks(start, end - start):
+                chunk = chunk_end + chunk
+                idx = chunk.find(magic)
+                if idx >= 0:
+                    address += idx
+                    break
+                address += len(chunk[:-len(magic)])
+                chunk_end = chunk[-len(magic):]
+            else:
+                raise RuntimeError('could not find RTT block')
+
+        return self.RttControl(self, address)
+
 class SerialBridge(Bridge):
     def __init__(self, port, baud=1_000_000, debug=False):
         self._port = serial.Serial(port, baud, timeout=0)
@@ -216,7 +395,7 @@ class SerialBridge(Bridge):
         data = self._port.read(256)
         # anti busy-loop
         if len(data) == 0:
-            time.sleep(0.1)
+            time.sleep(0.01)
         return data
 
     def write_raw(self, data):
@@ -377,8 +556,15 @@ def poke(bridge, start, words):
 
 @cli.command()
 @click.argument('elf', type=click.File('rb'))
+@click.option('--rtt-address', type=alegria.cli.BasedInt(), default=None)
+@click.option('--rtt-start', type=alegria.cli.BasedInt(),
+              default=0, show_default=True)
+@click.option('--rtt-end', type=alegria.cli.BasedInt(),
+              default=1 << 32, show_default=True)
+@click.option('-a', '--attach', is_flag=True)
 @pass_bridge
-def program(bridge, elf):
+@click.pass_context
+def program(ctx, bridge, elf, rtt_address, rtt_start, rtt_end, attach):
     elf = ELFFile(elf)
 
     bridge.reset(True)
@@ -395,6 +581,33 @@ def program(bridge, elf):
             bridge.write_bytes(start, data)
     finally:
         bridge.reset(False)
+
+    if attach:
+        ctx.invoke(rtt, address=rtt_address, start=rtt_start, end=rtt_end)
+
+@cli.command()
+@click.option('--address', type=alegria.cli.BasedInt(), default=None)
+@click.option('--start', type=alegria.cli.BasedInt(),
+              default=0, show_default=True)
+@click.option('--end', type=alegria.cli.BasedInt(),
+              default=1 << 32, show_default=True)
+@pass_bridge
+def rtt(bridge, address, start, end):
+    rtt = bridge.find_rtt(address=address, start=start, end=end)
+    up = None
+    for up in rtt.iter_ups():
+        if up.name == b'Terminal':
+            break
+    else:
+        raise RuntimeError('could not find Terminal channel')
+
+    while True:
+        data = up.read()
+        if data:
+            sys.stdout.buffer.write(data)
+            sys.stdout.buffer.flush()
+            continue
+        time.sleep(0.01)
 
 if __name__ == '__main__':
     cli()
