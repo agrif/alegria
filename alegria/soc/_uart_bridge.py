@@ -38,7 +38,8 @@ class UartBridge(am.lib.wiring.Component):
         WRITE = 4
 
     def __init__(self, *, addr_width, data_width, granularity=None,
-                 features=frozenset(), fifo_depth=16, divisor=None,
+                 features=frozenset(), fifo_depth=16,
+                 divisor=None, baud=1_000_000,
                  stop_bits=uart.StopBits.STOP_1, parity=uart.Parity.NONE):
 
         if granularity is None:
@@ -49,6 +50,7 @@ class UartBridge(am.lib.wiring.Component):
         self._features = frozenset(amsoc.wishbone.Feature(f) for f in features)
         self._fifo_depth = fifo_depth
         self._divisor = divisor
+        self._baud = baud
         self._stop_bits = stop_bits
         self._parity = parity
 
@@ -67,12 +69,12 @@ class UartBridge(am.lib.wiring.Component):
     def elaborate(self, platform):
         m = am.Module()
 
-        # calculate a divisor for 115200 baud in the default case
+        # calculate a divisor for requested baud in the default case
         # (does not work if we're not running on default clock!)
         divisor = self._divisor
         if divisor is None:
             if isinstance(platform, am.build.Platform):
-                divisor = int(round(platform.default_clk_period.hertz / 115200))
+                divisor = int(round(platform.default_clk_period.hertz / self._baud))
 
         if divisor is None:
             raise ValueError('could not guess divisor for uart')

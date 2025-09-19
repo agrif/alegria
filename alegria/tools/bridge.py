@@ -205,7 +205,7 @@ class Bridge:
                 break
 
 class SerialBridge(Bridge):
-    def __init__(self, port, baud=115200, debug=False):
+    def __init__(self, port, baud=1_000_000, debug=False):
         self._port = serial.Serial(port, baud, timeout=0)
         super().__init__(debug=debug)
 
@@ -270,7 +270,7 @@ def hexdump(data, start=0, linesize=16, file=None, end=True):
 @click.option('--sim', is_flag=True)
 @click.option('--cycles', type=alegria.cli.BasedInt(), default=None)
 @click.option('--vcd', default=None)
-@click.option('-b', '--baud', type=int, default=115200, show_default=True)
+@click.option('-b', '--baud', type=int, default=1_000_000, show_default=True)
 @click.option('-d', '--debug', is_flag=True)
 @click.pass_context
 def cli(ctx, path, sim, cycles, vcd, baud, debug):
